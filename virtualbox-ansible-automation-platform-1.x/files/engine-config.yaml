@@ -1,0 +1,43 @@
+---
+# cofigure kubernetes nodes with users and access
+
+- hosts: all
+  become: true
+
+  vars:
+    local_user_name: ansible
+    local_user_password: ansible
+    key_pair_path: /tmp/id_ssh_rsa
+    remote_user_name: devops
+    remote_user_password: devops
+    ansible_content_directory: "ansible-book"
+
+  tasks:
+
+    - name: Create {{ local_user_name }} user on ansible node
+      user:
+        name: "{{ local_user_name }}"
+        password: "{{ local_user_password }}"
+        #password: "{{ local_user_password | password_hash('sha512') }}"
+        groups: wheel
+        append: yes
+      #when: inventory_hostname == 'ansible'
+    
+    - name: Add sudo entries for {{ local_user_name }}
+      copy:
+        content: "{{ local_user_name }} ALL=(ALL) NOPASSWD: ALL"
+        dest: "/etc/sudoers.d/{{ local_user_name }}"
+      #when: inventory_hostname == 'ansible'
+
+    - name: Configure Hostname (set hostname)
+      hostname:
+        name: "{{ inventory_hostname }}.lab.local"
+    
+    #- name: Update /etc/hosts with node entries
+    #  debug:
+    #    msg: "{{ item }} - {{ hostvars[item]['ansible_facts']['all_ipv4_addresses'] }}"
+    #  #lineinfile:
+    #  #  path: /etc/hosts['ipv4']['address']
+    #  #  line: "{{ hostvars[item]['ansible_eth1'][] \t{{ hostvars[item]['ansible_hostname']}}\t{{ #hostvars[item]['ansible_hostname']}}"
+    #  become: true
+    #  loop: "{{ groups['all'] }}"

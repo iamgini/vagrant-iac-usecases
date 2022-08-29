@@ -1,0 +1,13 @@
+---
+- hosts: all
+  vars:
+    wp_version: 5.0.3
+    wp_mysql_db: 'database_name_here'
+    wp_mysql_user: 'username_here'
+    wp_mysql_password: 'password_here'
+    wp_webserver: nginx
+    wp_sitename: example.com
+    wp_admin_email: 'admin@example.com'
+    wp_install_dir: "/var/www/{{ wp_sitename }}"
+  roles:
+    - makarenalabs.wordpress

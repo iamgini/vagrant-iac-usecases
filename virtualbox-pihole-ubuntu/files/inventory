@@ -1,0 +1,12 @@
+[ansible]
+ansible ansible_host=192.168.100.10 ansible_connection=local
+
+[nodes]
+pihole ansible_host=192.168.100.4
+
+[all:vars]
+ansible_user=devops
+#ansible_password=vagrant
+ansible_connection=ssh
+ansible_ssh_private_key_file= /home/devops/.ssh/id_rsa
+ansible_ssh_extra_args= ' -o StrictHostKeyChecking=no -o PreferredAuthentications=password '

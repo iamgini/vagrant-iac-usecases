@@ -1,0 +1,31 @@
+---
+- name: Wordpress | Nginx | Figure out PHP FPM socket location
+  shell: dpkg -l | grep php-fpm  | awk '{print $3}' | grep -o '[0-9]\.[0-9]' | head -n 1
+  register: 'php_ver'
+
+- name: Start service php{{ php_ver.stdout }}
+  service:
+    name: "php{{ php_ver.stdout }}-fpm"
+    state: started
+
+- name: Start service nginx
+  service:
+    name: "nginx"
+    state: started
+
+- name: Wordpress | Nginx | Copy virtual host configuration file
+  template:
+    src: "nginx-vhost.j2"
+    dest: "/etc/nginx/sites-available/{{ wp_sitename }}"
+    owner: root
+    group: root
+    mode: 0644
+
+- name: WordPress | Nginx | Symlink virtual host configuration file from sites-available to sites-enabled
+  file:
+    state: link
+    src: "/etc/nginx/sites-available/{{ wp_sitename }}"
+    dest: "/etc/nginx/sites-enabled/{{ wp_sitename }}"
+    owner: root
+    group: root
+    mode: 0644

@@ -1,0 +1,48 @@
+## RHEL7 - Use below
+IMAGE_NAME = "generic/rhel7"
+
+## RHEL8 - Use below
+## IMAGE_NAME = "generic/rhel8" 
+
+NODE_NAME = "rhel-vm"
+
+Vagrant.configure("2") do |config|
+    #config.ssh.insert_key = false
+
+    config.vm.provider "virtualbox" do |v|
+        v.memory = 2048
+        v.cpus = 2
+    end
+    
+    config.ssh.insert_key = true
+    config.ssh.forward_agent = true
+
+    config.vm.network "forwarded_port",
+    guest: 80,
+    host:  8080,
+    auto_correct: true
+
+    config.vm.network "forwarded_port",
+    guest: 443,
+    host:  8443,
+    auto_correct: true
+
+    config.vm.define NODE_NAME do |master|     
+
+        master.vm.box = IMAGE_NAME
+        master.vm.network "private_network", ip: "192.168.50.100"
+        master.vm.hostname = NODE_NAME
+
+        # naming the virtualmachine
+        master.vm.provider :virtualbox do |vb|
+            vb.name = NODE_NAME
+        end
+        #master.vm.provision "ansible_local" do |ansible|
+        #    ansible.compatibility_mode = "2.0"
+        #    ansible.playbook = "install-minikube.yaml"
+        #    ansible.extra_vars = {
+        #        node_ip: "192.168.50.10",
+        #    }
+        #end
+    end
+end

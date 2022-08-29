@@ -1,0 +1,147 @@
+---
+# cofigure kubernetes nodes with users and access
+
+- hosts: all
+  become: true
+
+  vars:
+    local_user_name: ansible
+    local_user_password: ansible
+    key_pair_path: /tmp/id_ssh_rsa
+    remote_user_name: devops
+    remote_user_password: devops
+    ansible_content_directory: "ansible-book"
+
+  tasks:
+    - name: Upgrade pip
+      pip:
+        name: pip
+        extra_args: --upgrade
+      #become: true
+      #become_user: "{{ local_user_name }}"
+      when: inventory_hostname == 'ansible'
+
+    - name: Create {{ local_user_name }} user on ansible node
+      user:
+        name: "{{ local_user_name }}"
+        password: "{{ local_user_password }}"
+        #password: "{{ local_user_password | password_hash('sha512') }}"
+        groups: wheel
+        append: yes
+      when: inventory_hostname == 'ansible'
+    
+    - name: Add sudo entries for {{ local_user_name }}
+      copy:
+        content: "{{ local_user_name }} ALL=(ALL) NOPASSWD: ALL"
+        dest: "/etc/sudoers.d/{{ local_user_name }}"
+      when: inventory_hostname == 'ansible'
+
+    # Synchronize playbook content
+    #- name: Add laybook directory
+    #  file:
+    #    path: "{{ ansible_content_directory }}"
+    #    state: directory
+    #    owner: "{{ local_user_name }}"
+    #    group: "{{ local_user_name }}"
+    # # when: a is defined
+    #- synchronize:
+    #    src: "/home/vagrant/{{ ansible_content_directory }}"
+    #    dest: "/home/{{ local_user_name }}/{{ ansible_content_directory }}"
+    #    owner: "{{ local_user_name }}"
+    #    group: "{{ local_user_name }}"
+    #  delegate_to: "{{ inventory_hostname }}"
+
+    - name: Add .ssh directories
+      file:
+        path: /home/{{ local_user_name }}/.ssh
+        state: directory
+        mode: 0700
+        owner: "{{ local_user_name }}"
+        group: "{{ local_user_name }}"
+      when: inventory_hostname == 'ansible'
+
+    - name: Generate an OpenSSH keypair
+      community.crypto.openssh_keypair:
+        path: "{{ key_pair_path }}"
+        size: 4096
+        type: rsa
+        comment: "ansible@ansible"
+      delegate_to: localhost
+      become: false
+      when: inventory_hostname == 'ansible'
+
+    - name: Copy key-pair to {{ local_user_name }} home
+      copy:
+        src: "{{ item }}"
+        dest: "/home/{{ local_user_name }}/.ssh/{{ item | basename }}"
+        mode: '0600'
+        force: yes
+      with_items:
+        - "{{ key_pair_path }}"
+        - "{{ key_pair_path }}.pub"
+      when: inventory_hostname == 'ansible'
+
+    - name: Copy Sample files to {{ local_user_name }} home
+      copy:
+        src: "{{ item }}"
+        dest: "/home/{{ local_user_name }}/{{ item }}"
+        mode: '0755'
+        force: yes
+      with_items:
+        - inventory
+        - ansible.cfg
+      when: inventory_hostname == 'ansible'
+
+    - name: Install ansible using pip
+      pip:
+        name: ansible
+      when: inventory_hostname == 'ansible'
+
+    - name: Add key to managed nodes
+      ansible.posix.authorized_key:
+        user: "{{ remote_user }}"
+        key: "{{ key_pair_path }}.pub"
+        manage_dir: yes
+      when: remote_user_public_key is defined
+
+    - name: Install Packages
+      yum: 
+        name: 
+          - git
+          - vim
+        state: present
+      when: rhsubs is defined
+
+    - name: Update /etc/hosts with node entries
+      blockinfile:
+        path: /etc/hosts
+        block: |
+          192.168.100.10 ansible
+          192.168.100.4 node
+      become: true
+      when: a is defined
+    
+    - name: Create {{ remote_user_name }} user on managed nodes
+      user:
+        name: "{{ remote_user_name }}"
+        password: "{{ local_user_password }}"
+        #password: "{{ local_user_password | password_hash('sha512') }}"
+        groups: wheel
+        append: yes
+      when: inventory_hostname != 'ansible'
+    
+    - name: Add sudo entries for {{ remote_user_name }}
+      copy:
+        content: "{{ remote_user_name }} ALL=(ALL) NOPASSWD: ALL"
+        dest: "/etc/sudoers.d/{{ remote_user_name }}"
+      when: inventory_hostname != 'ansible'
+    
+    - name: Add .ssh directories
+      file:
+        path: /home/{{ remote_user_name }}/.ssh
+        state: directory
+        mode: 0700
+        owner: "{{ remote_user_name }}"
+        group: "{{ remote_user_name }}"
+      when: inventory_hostname != 'ansible' 
+    

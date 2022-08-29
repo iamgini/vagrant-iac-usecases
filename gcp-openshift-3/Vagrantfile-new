@@ -1,0 +1,36 @@
+$ cat Vagrantfile
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+$script = <<-SCRIPT
+cat > /etc/docker/daemon.json << EOF
+{
+   "insecure-registries": [
+     "172.30.0.0/16"
+   ]
+}
+EOF
+echo Restarting Docker...
+systemctl daemon-reload
+systemctl restart docker
+OPENSHIFT=openshift-origin-client-tools-v3.10.0-dd10d17-linux-64bit
+echo Downloading Openshift binaries: $OPENSHIFT
+wget -q https://github.com/openshift/origin/releases/download/v3.10.0/$OPENSHIFT.tar.gz
+tar xvf $OPENSHIFT.tar.gz
+mv $OPENSHIFT openshift
+rm $OPENSHIFT.tar.gz
+sudo -u vagrant echo "export PATH=$PATH:/home/vagrant/openshift" >> .bash_profile
+SCRIPT
+
+Vagrant.configure("2") do |config|
+  config.vm.provider "virtualbox" do |v|
+    v.memory = 16384
+    v.cpus = 2
+  end
+
+  config.vm.box = "bento/centos-7.6"
+  config.vm.network "private_network", type: "dhcp"
+  config.vm.network "forwarded_port", guest: 8443, host: 8443
+  config.vm.provision "docker"
+  config.vm.provision "shell", inline: $script
+end

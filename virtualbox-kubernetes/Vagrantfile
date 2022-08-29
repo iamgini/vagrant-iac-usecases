@@ -1,0 +1,69 @@
+#IMAGE_NAME = "bento/ubuntu-16.04"
+IMAGE_NAME = "bento/ubuntu-20.04"
+CONTROLPLANE_NODES = 2
+COMPUTE_NODES = 2
+CLUSTER_NAME = "demo"
+APISERVER_ADVERTISE_ADDRESS = "192.168.56.50"
+NODE_IP_ADDRESS_RANGE = "192.168.56"
+CONTROLPLANE_IP_ADDRESS = "50"
+CONTROLPLANE_NODE_MEMORY = "2048"
+COMPUTE_NODE_MEMORY = "2048"
+
+Vagrant.configure("2") do |config|
+    config.ssh.insert_key = false
+    config.vm.define "controlplane" do |controlplane|
+        controlplane.vm.box = IMAGE_NAME
+        controlplane.vm.network "private_network", ip: APISERVER_ADVERTISE_ADDRESS
+        controlplane.vm.hostname = "#{CLUSTER_NAME}-k8s-controlplane"
+        # customize virtualmachine
+        controlplane.vm.provider :virtualbox do |vb|
+            vb.name = "#{CLUSTER_NAME}-k8s-controlplane"
+            vb.memory = CONTROLPLANE_NODE_MEMORY
+            vb.cpus = 2
+        end
+
+        config.vm.network "forwarded_port",
+        guest: 8001,
+        host:  8001,
+        auto_correct: true
+        
+        config.vm.network "forwarded_port",
+        guest: 30000,
+        host:  30000,
+        auto_correct: true
+        
+        config.vm.network "forwarded_port",
+        guest: 8443,
+        host:  8443,
+        auto_correct: true
+
+        controlplane.vm.provision "ansible" do |ansible|
+            ansible.compatibility_mode = "2.0"
+            ansible.playbook = "kubernetes-setup/controlplane-playbook.yml"
+            ansible.extra_vars = {
+                node_ip: APISERVER_ADVERTISE_ADDRESS,
+                apiserver_advertise_address: APISERVER_ADVERTISE_ADDRESS
+            }
+        end
+    end
+
+    (1..COMPUTE_NODES).each do |i|
+        config.vm.define "compute-#{i}" do |node|
+            node.vm.box = IMAGE_NAME
+            node.vm.network "private_network", ip: "#{NODE_IP_ADDRESS_RANGE}.#{i + 50}"
+            node.vm.hostname = "#{CLUSTER_NAME}-compute-#{i}"
+            # customize virtualmachine
+            node.vm.provider :virtualbox do |vb|
+                vb.name = "#{CLUSTER_NAME}-compute-#{i}"
+                vb.memory = COMPUTE_NODE_MEMORY
+                vb.cpus = 1
+            end
+            node.vm.provision "ansible" do |ansible|
+                ansible.playbook = "kubernetes-setup/compute-node-playbook.yml"
+                ansible.extra_vars = {
+                    node_ip: APISERVER_ADVERTISE_ADDRESS
+                }
+            end
+        end
+    end
+end
