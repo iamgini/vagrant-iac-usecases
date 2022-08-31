@@ -23,3 +23,6 @@ mkdir -p /home/devops/.ssh/
 cat host_ssh_public_key >> /home/devops/.ssh/authorized_keys
 chown -R devops:devops /home/devops/
 chmod 600 /home/devops/.ssh/authorized_keys
+
+# Get IP Details
+ip a 
