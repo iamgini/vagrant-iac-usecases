@@ -3,9 +3,9 @@
   become_method: sudo
   vars:
     minikube_version: 1.25.2
-    kubectl_version: 1.18.6
-    docker_version: 19.03.11
-    helm_version: 3.2.4
+    kubectl_version: 1.25.2
+    docker_version: 20.10.14
+    helm_version: 3.8.2
   tasks:
 
     - name: install system updates
