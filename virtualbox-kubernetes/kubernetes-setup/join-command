@@ -1,0 +1,1 @@
+kubeadm join 192.168.56.50:6443 --token agnwyo.l7wdfdtkwjyf1y4m --discovery-token-ca-cert-hash sha256:23848b2da55f735079e7173cc5eed544ede6ddb868b6dea7f6b2e1994d0e192b 

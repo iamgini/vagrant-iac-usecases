@@ -1,0 +1,11 @@
+firewall_ports:
+  - 6443/tcp
+  - 2379:2380/tcp
+  - 10250/tcp
+  - 10259/tcp
+  - 10257/tcp
+  # Opening ports for Calico CNI
+  - 179/tcp
+  - 4789/udp
+  - 4789/tcp
+  - 2379/tcp

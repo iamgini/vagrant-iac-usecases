@@ -1,0 +1,232 @@
+---
+- name: Configure Ansible AWX Server
+  hosts: all
+  become: yes
+  vars_files:
+    - var/main.yml
+  tasks:
+    - name: Install epel repo      
+      yum:
+        name: epel-release
+        state: latest
+
+    - name: Install jq, yum-utils, lvm2, device-mapper-persistent-data
+      yum: 
+        name: "{{ item }}" 
+        state: latest
+      with_items:
+        - jq
+        - yum-utils
+        - device-mapper-persistent-data
+        - lvm2
+        - python2-pip
+        
+    - name: Add and enable docker-ce repo
+      get_url:
+        url: https://download.docker.com/linux/centos/docker-ce.repo
+        dest: /etc/yum.repos.d/docer-ce.repo
+      become: yes
+    
+    - name: Enable Docker Edge repo
+      ini_file:
+        dest: /etc/yum.repos.d/docer-ce.repo
+        section: 'docker-ce-edge'
+        option: enabled
+        value: 0
+      become: yes
+    
+    - name: Enable Docker Test repo
+      ini_file:
+        dest: /etc/yum.repos.d/docer-ce.repo
+        section: 'docker-ce-test'
+        option: enabled
+        value: 0
+      become: yes
+
+    - name: Install Docker-CE
+      package:
+        name: docker-ce
+        state: latest
+      become: yes
+
+    - name: Start and Enable Docker service
+      service:
+        name: docker
+        state: started
+        enabled: yes
+      become: yes
+
+    - name: Install ansible and docker-compose
+      pip:
+        name: "{{ item }}"
+      become: yes
+      with_items:
+        - ansible
+        - docker-compose
+
+    - debug:
+        var: ansible_env.HOME
+
+    - name: Download AWX package
+      get_url:
+        url: https://codeload.github.com/ansible/awx/tar.gz/6.1.0
+        dest: "{{ ansible_env.HOME }}/ansible-awx-6.1.0.tar.gz"
+      become: yes
+
+    - name: Extract AWX content
+      unarchive:
+        src: "{{ ansible_env.HOME }}/ansible-awx-6.1.0.tar.gz"
+        dest: "{{ ansible_env.HOME }}/"
+        remote_src: yes
+      become: yes
+    
+    - name: Disable dockerhub reference in order to build local images
+      replace:
+        path: "{{ ansible_env.HOME }}/awx-6.1.0/installer/inventory"
+        regexp: '^dockerhub_base=ansible'
+        replace: '#dockerhub_base=ansible'
+
+    - name: Provide psql data path to installer
+      replace:
+        path: "{{ ansible_env.HOME }}/awx-6.1.0/installer/inventory"
+        regexp: '^postgres_data_dir.*'
+        replace: 'postgres_data_dir=/opt/awx-psql-data'
+            
+    - name: Create directory for plsql data
+      file:
+        path: /opt/awx-psql-data
+        state: directory
+      become: yes
+
+    - name: Create directory for AWX SSL 
+      file:
+        path: /etc/awx-ssl/
+        state: directory
+      become: yes
+
+      # (Change to openssl module later)
+    - name: Generate a Self Signed OpenSSL certificate 
+      shell: "openssl req -subj '/CN=labs.local/O=Labs Local/C=TR' -new -newkey rsa:2048 -sha256 -days 1365 -nodes -x509 -keyout /etc/awx-ssl/awx.key -out /etc/awx-ssl//awx.crt"
+
+    - name: Merge awx.key and awx.crt files
+      shell: "cat /etc/awx-ssl/awx.key /etc/awx-ssl/awx.crt > /etc/awx-ssl/awx-bundled-key.crt"
+
+    - name: Pass the full path of awx-bundled-key.crt
+      replace:
+        path: "{{ ansible_env.HOME }}/awx-6.1.0/installer/inventory"
+        regexp: '^#([[:space:]]?)ssl_certificate='
+        replace: 'ssl_certificate=/etc/awx-ssl/awx-bundled-key.crt'
+
+    - name: Adding Logo package
+      get_url:
+        url: https://github.com/ansible/awx-logos/archive/master.tar.gz
+        dest: "{{ ansible_env.HOME }}/awx-6.1.0/awx-logos.tar.gz"
+      become: yes
+
+    - name: Extract AWX content
+      unarchive:
+        src: "{{ ansible_env.HOME }}/awx-6.1.0/awx-logos.tar.gz"
+        dest: "{{ ansible_env.HOME }}/awx-6.1.0/"
+        remote_src: yes
+      become: yes
+    
+    - name: Rename awx-logos-master folder as awx-logos  
+      shell: "mv {{ ansible_env.HOME }}/awx-6.1.0/awx-logos-master {{ ansible_env.HOME }}/awx-6.1.0/awx-logos"
+
+    - name: Update logo path in inventory
+      replace:
+        path: "{{ ansible_env.HOME }}/awx-6.1.0/installer/inventory"
+        regexp: '^#([[:space:]]?)awx_official=false'
+        replace: 'awx_official=true'
+
+    - name: Define the default admin username
+      replace:
+        path: "{{ ansible_env.HOME }}/awx-6.1.0/installer/inventory"
+        regexp: '^admin_user=.*'
+        replace: 'admin_user=awx-admin'
+
+    - name: Set a password for the admin
+      replace:
+        path: "{{ ansible_env.HOME }}/awx-6.1.0/installer/inventory"
+        regexp: '^admin_password=.*'
+        replace: 'admin_password=awxadmin'
+
+    - name: "Run AWX installation playbook - WARNING : PLEASE BE PATIENT"
+      command: "ansible-playbook -i inventory install.yml"
+      args:
+        chdir: "{{ ansible_env.HOME }}/awx-6.1.0//installer"
+        creates: /etc/awx_playbook_complete
+
+    - name: Create a file to mark whether this playbook has completed.
+      file:
+        path: /etc/awx_playbook_complete
+        state: touch
+      changed_when: False
+
+
+#----------- System configurations ----------------------------------------------------------
+    - name: Start Firewall service
+      service:
+        name: firewalld
+        state: started
+        enabled: true
+
+    - name: Enable ssh and http ports
+      firewalld:
+        service: "{{ item }}"
+        permanent: yes
+        immediate: yes
+        state: enabled
+      with_items:
+        - http
+        - https
+        - ssh
+
+    # Lockdown ssh access
+    - name: Disallow password authentication
+      lineinfile: 
+        dest: /etc/ssh/sshd_config
+        regexp: "^PasswordAuthentication"
+        line: "PasswordAuthentication no"
+        state: present
+      notify: restart ssh
+
+    - name: Disallow root SSH access
+      lineinfile:
+        dest: /etc/ssh/sshd_config
+        regexp: "^PermitRootLogin"
+        line: "PermitRootLogin no"
+        state: present
+      notify: restart ssh
+
+    - name: Collect Public IP to access
+      uri: 
+        url: http://169.254.169.254/computeMetadata/v1/instance/network-interfaces/0/access-configs/0/external-ip
+        dest: /tmp/abc
+        return_content: yes
+        headers:
+          Metadata-Flavor: "Google"
+      register: instance_meta
+      #notify: show public url
+    
+    # Disabled as awx will take some time to complete update
+    #- name: Verify website access
+    #  uri:
+    #    url: "http://{{ instance_meta.content }}"
+    #    status_code: 200
+      
+  handlers:
+    - name: restart ssh
+      service:
+        name: sshd
+        state: restarted
+
+# Show Public Hostname/Url to access website
+- name: Display status
+  hosts: all
+  vars_files:
+    - var/main.yml
+  tasks:
+    - name: Show public IP to Access
+      debug:
+        msg: "Ansible AWX Portal can be accessed using public IP : http://{{ instance_meta.content }}" #{{ ansible_default_ipv4 }}" # : {{ aws_meta.content }}

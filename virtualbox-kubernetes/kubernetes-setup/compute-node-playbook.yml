@@ -1,0 +1,49 @@
+---
+- hosts: all
+  become: true
+  vars_files:
+    - variables.yaml
+  tasks:
+
+  - name: Configure repo and update system
+    include_tasks:
+      file: 01-repo-config.yaml
+
+  - name: Configure repo and update system
+    include_tasks:
+      file: 02-configure-system.yaml
+
+  - name: Install packages
+    include_tasks:
+      file: 03-configure-packages.yaml
+
+  - name: Install packages
+    include_tasks:
+      file: 04-disable-swap.yaml
+
+  - name: Install k8s tools
+    include_tasks:
+      file: 05-install-k8s-tools.yaml
+
+  - name: Configure node ip
+    lineinfile:
+      #changedthis
+      create: yes
+      path: /etc/default/kubelet
+      line: KUBELET_EXTRA_ARGS=--node-ip={{ node_ip }}
+
+  - name: Restart kubelet
+    service:
+      name: kubelet
+      daemon_reload: yes
+      state: restarted
+
+# Step 3.2: Join the nodes to the Kubernetes cluster using below code.
+  - name: Copy the join command to server location
+    copy: 
+      src: join-command
+      dest: /tmp/join-command.sh
+      mode: '0777'
+
+  - name: Join the node to cluster
+    command: sh /tmp/join-command.sh

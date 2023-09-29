@@ -1,0 +1,33 @@
+# Require the GCP provider plugin 
+require 'vagrant-google'
+NODE_NAME = "centos-wordpress"
+
+# Create and configure the GCP instance(s)
+Vagrant.configure('2') do |config|
+  
+  # Since we are using GCP Image, below config.vm.box is just for syntax purpose.
+  config.vm.box = "google/gce"
+
+  config.vm.hostname = NODE_NAME
+
+  # Specify GCP provider configurations
+  config.vm.provider :google do |google, override|
+    google.google_project_id = "pemvsg-pe-staging"
+    google.google_json_key_location = "~/.gcp/PEMVSG-PE-STAGING-a324d3cd4696.json"
+    google.image_family = 'ubuntu-1604-lts'
+    machine_type = 'g1-small' #g1-small / n1-standard-1 / n1-standard-2 etc
+
+    # for devops
+    override.ssh.username = 'devops'
+    override.ssh.private_key_path = '~/.ssh/id_rsa'
+    config.ssh.insert_key = false
+
+  end
+
+  # Specify Ansible as provisioner and provide the playbook details.
+  # Use ansible_local instead of ansible if you are on windows (if ansible not available on host)
+  config.vm.provision "ansible" do |ansible|
+    ansible.verbose = "v"
+    ansible.playbook = "deploy-wordpress.yaml"
+  end
+end

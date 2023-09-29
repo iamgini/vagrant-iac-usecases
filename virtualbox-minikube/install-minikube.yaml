@@ -1,0 +1,248 @@
+- hosts: all
+  become: yes
+  become_method: sudo
+  vars:
+    minikube_version: 1.25.2
+    kubectl_version: 1.25.2
+    docker_version: 20.10.14
+    helm_version: 3.8.2
+  tasks:
+
+    - name: install system updates
+      yum: 
+        name: "*"
+        state: latest 
+        update_cache: yes
+
+    - name: Disable SELinux
+      selinux:
+        state: disabled
+
+    - name: disable swap
+      shell: /usr/sbin/swapoff -a
+
+    - name: disable swap permanently
+      lineinfile:
+        path: /etc/fstab
+        regexp: '^[^#].*swap.*$'
+        state: absent
+
+    - name: delete swapfile
+      file:
+        path: /swapfile
+        state: absent
+
+    - name: install prerequisites
+      yum:
+        name: [ vim, socat, device-mapper-persistent-data, lvm2, telnet, tcpdump, conntrack-tools, bind-utils ]
+
+    - name: download minikube version {{ minikube_version }} rpm
+      get_url:
+        url: https://github.com/kubernetes/minikube/releases/download/v{{ minikube_version }}/minikube-{{ minikube_version }}-0.x86_64.rpm
+        dest: /var/tmp/minikube-{{ minikube_version }}.rpm
+        mode: '0644'
+
+    - name: install minikube version {{ minikube_version }} rpm
+      yum:
+        name: /var/tmp/minikube-{{ minikube_version }}.rpm
+        disable_gpg_check: true
+
+    - name: delete minikube version {{ minikube_version }} rpm
+      file:
+        path: /var/tmp/minikube-{{ minikube_version }}.rpm
+        state: absent
+
+    - name: add docker repository
+      yum_repository:
+        name: docker-ce-stable
+        description: Docker CE Stable - $basearch
+        baseurl: https://download.docker.com/linux/centos/7/$basearch/stable
+        gpgcheck: yes
+        gpgkey: https://download.docker.com/linux/centos/gpg
+
+    - name: install docker-ce version {{ docker_version }}
+      yum:
+        name: docker-ce-{{ docker_version }}
+
+    - name: start and enable docker service
+      service:
+        name: docker
+        enabled: yes
+        state: started
+
+    - name: Add vagrant user to docker group
+      user:
+        name: vagrant
+        groups: docker
+        append: yes
+
+    - name: set bridge-nf-call-iptables = 1
+      lineinfile:
+        path: /etc/sysctl.conf
+        line: net.bridge.bridge-nf-call-iptables = 1
+
+    - name: apply sysctl config
+      shell: sysctl -p
+
+    - name: start minikube
+      shell: minikube start --vm-driver=none
+
+    - name: Add service-node-port-range parameter to minikube config file
+      lineinfile:
+        state: present
+        path: /etc/kubernetes/manifests/kube-apiserver.yaml
+        line: '    - --service-node-port-range=1024-65535'
+        insertafter: '^.*service-account-key-file.*$'
+
+    - name: start and enable kubelet service
+      service:
+        name: kubelet
+        enabled: yes
+        state: started
+    
+    - name: create dir /home/vagrant/bin
+      file:
+        path: /home/vagrant/bin
+        state: directory
+
+    - name: add kubernetes repository
+      yum_repository:
+        name: Kubernetes
+        description: Kubernetes
+        baseurl: https://packages.cloud.google.com/yum/repos/kubernetes-el7-x86_64
+        gpgcheck: yes
+        gpgkey: https://packages.cloud.google.com/yum/doc/yum-key.gpg https://packages.cloud.google.com/yum/doc/rpm-package-key.gpg
+
+    - name: install kubectl version {{ kubectl_version }}
+      yum:
+        name: kubectl-{{ kubectl_version }}
+
+    - name: copy kubectl conf
+      copy:
+        src: /root/.kube
+        dest: /home/vagrant/
+        remote_src: yes
+        owner: vagrant
+        group: vagrant
+
+    - name: fix kubectl conf
+      replace:
+        path: /home/vagrant/.kube/config
+        regexp: '/root'
+        replace: '/home/vagrant'
+
+    - name: enable kubectl autocompletion
+      lineinfile:
+        path: /home/vagrant/.bashrc
+        line: source <(kubectl completion bash)
+        insertafter: EOF
+        create: yes
+
+    - name: enable kubectl alias k
+      lineinfile:
+        path: /home/vagrant/.bashrc
+        line: alias k="kubectl"
+        insertafter: EOF
+
+    - name: enable kubectl alias kc
+      lineinfile:
+        path: /home/vagrant/.bashrc
+        line: alias kc="kubectl"
+        insertafter: EOF
+
+    - name: copy minikube conf
+      copy:
+        src: /root/.minikube
+        dest: /home/vagrant/
+        remote_src: yes
+        owner: vagrant
+        group: vagrant
+
+    - name: create /vagrant directory
+      file:
+        path: /vagrant
+        state: directory
+
+    - name: download helm version {{ helm_version }}
+      get_url:
+        url: https://get.helm.sh/helm-v{{ helm_version }}-linux-amd64.tar.gz
+        dest: /var/tmp/helm-v{{ helm_version }}-linux-amd64.tar.gz
+        mode: 0755
+
+    - name: extract helm version {{ helm_version }}
+      unarchive:
+        src: /var/tmp/helm-v{{ helm_version }}-linux-amd64.tar.gz
+        remote_src: yes
+        dest: /home/vagrant/bin
+        extra_opts:
+          - "linux-amd64/helm"
+          - "--strip-components=1"
+        mode: 0755
+
+    - name: delete downloaded helm version {{ helm_version }} installer
+      file:
+        path: /var/tmp/helm-v{{ helm_version }}-linux-amd64.tar.gz
+        state: absent
+
+    - name: change helm executable ownership to vagrant
+      file:
+        path: /home/vagrant/bin/helm
+        mode: 0755
+        owner: vagrant
+        group: vagrant
+
+    - name: Pause for 5 minutes
+      ansible.builtin.pause:
+        minutes: 5
+
+    - name: Install and enable kubernetes dashboard components
+      shell: kubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/v2.0.0/aio/deploy/recommended.yaml
+      #shell: sudo kubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/master/aio/deploy/recommended.yaml
+
+    #- name: Install Kubernetes Ingress components
+    #  shell: sudo kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/master/deploy/static/mandatory.yaml
+          
+    - name: Create dashboard admin user
+      shell: kubectl apply -f /vagrant/dashboard-adminuser.yaml
+
+    - name: Create Directory for basic Start page
+      file:
+        path: /home/vagrant/minikube
+        state: directory
+
+    - name: Copy Start Page for Easy Testing
+      copy:
+        src: index.html
+        dest: /home/vagrant/minikube/index.html
+        owner: vagrant
+        group: vagrant
+        
+    - name: Start kubectl proxy 
+      shell: "nohup kubectl proxy --address='0.0.0.0' –port=8001 --www=/home/vagrant/minikube --www-prefix=/minikube/"
+      async: 100
+      poll: 0
+      register: start_kube_proxy
+
+    - name: Check kubectl proxy output
+      debug:
+        msg: "{{ start_kube_proxy }}"
+
+    - name: Get Secret to Authenticate to kubernetes dashboard
+      shell: "kubectl -n kube-system get secret | grep default-token | awk '{print $1}'"
+      register: get_token
+
+    - name: Extract secret name
+      set_fact:
+        KUBE_TOKEN: "{{ get_token.stdout }}"
+
+    - name: Get Token to Authenticate to kubernetes dashboard
+      shell: "kubectl -n kube-system describe secret {{ KUBE_TOKEN }} | grep token: | awk '{print $2}'"
+      register: get_token_value
+    
+    - name: Access Below URL from your Host machine browser
+      debug:
+        msg: "http://localhost:8001/minikube/"
+  
+    - name: Use below token to authenticate in kubernetes dashboard"
+      debug:
+        msg: "{{ get_token_value.stdout }}"

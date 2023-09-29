@@ -1,0 +1,40 @@
+# Require the GCP provider plugin 
+# require 'vagrant-google'
+
+# Create and configure the GCP instance(s)
+Vagrant.configure('2') do |config|
+  
+  # Ref https://app.vagrantup.com/ansible/boxes/tower
+  config.vm.box = "ansible/tower"
+  config.vm.network "private_network", ip: "192.168.50.4", virtualbox__intnet: "intnet"
+    #virtualbox__intnet: true
+    
+
+  # config.vm.hostname = "webserver101"
+
+  # Specify GCP provider configurations
+  #onfig.vm.provider :google do |google, override|
+  # google.google_project_id = "vd-devops-271814"       
+  # # google.google_json_key_location = "~/DevOps-VinMel-a1d7290c059e.json"  # for my Mac
+  # google.google_json_key_location = "~/.gcp/vd-devops-271814-0320d6111b57.json"
+  # google.image_family = 'centos-7' #'ubuntu-1604-lts'
+  # machine_type = 'n1-standard-1' #g1-small / n1-standard-1 / n1-standard-2 etc
+  # disk_size = 20
+  # # From my Mac
+  # #override.ssh.username = 'gini'
+  # #override.ssh.private_key_path = "~/.ssh/id_gce"   
+
+  # # for devops
+  # override.ssh.username = 'devops'
+  # override.ssh.private_key_path = '~/.ssh/id_rsa'
+
+  # config.ssh.insert_key = false
+
+  #nd
+
+  # Specify Ansible as provisioner and provide the playbook details.
+  #config.vm.provision "ansible_local" do |ansible|
+  #  ansible.verbose = "v"
+  #  ansible.playbook = "deploy-awx.yml"
+  #end
+end

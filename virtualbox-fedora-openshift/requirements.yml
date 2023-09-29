@@ -1,0 +1,5 @@
+---
+collections:
+# With just the collection name
+  - community.crypto
+  - ansible.posix

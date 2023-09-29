@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+<title>Welcome to <strong>minikube</strong> Start Page</title>
+</head>
+<body style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
+<div class="container" style="padding: 100px; text-align: left;">
+<h1>minikube</h1>
+
+<h3>Configured using Vagrant and Ansible on top of VirtuakBox</h3>
+
+<p>
+  Access dashboard : <a href="/api/v1/namespaces/kubernetes-dashboard/services/https:kubernetes-dashboard:/proxy/" target="_blank">Kubernetes Dashboard WebUI</a>
+</p>
+
+<p>
+Take Token from <code>vagrant up</code> output and login with token.
+</p>
+<p>
+  Please note, token is a <b>single line</b> text and no line break should be included.
+  </p>
+
+
+<h4>Sample output for reference</h4>
+<code>
+  TASK [Use below token to authenticate in kubernetes dashboard"] ************<br>
+  ok: [centos-minikube] => {<br>
+      "msg": <br> "eyJhbGciOiJSUzßI1NiIsImtpZCI6IklyLTdpd0UzZzRCZ2s3U1cxOTlOUG<br> 
+      tGcVlGQ21wMkYzZGtWdWk4T0dNSm8ifQeyJpc3MiOiJrdWJlcm5ldGVzL3NlcnZpY2VhY2Nv<br>
+      .<br>
+      .[truncated output]<br>
+      .<br>
+      Vw6IML2NCdtCe2dGIEv2lC654ji5GRGhk1-fvytTSgTFzGW20gMhOAaZYHAdGYghytuzAEvB<br> HhMIKSIxqojPacr3Mr2xLx0ipwI_c5JUIqPgdN77pBvbjXVuzJ0kRxW1Fw"<br> 
+  }<br> 
+</code>
+</p>
+
+<br> <br> 
+<a href="https://www.iamgini.com" target="_blank">iamgini.com</a> | <a href="https://www.youtube.com/techbeatly?sub_confirmation=1" target="_blank">YouTube</a>
+
+</div>
+</body>
+</html>

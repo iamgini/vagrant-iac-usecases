@@ -1,0 +1,51 @@
+global:
+  sql_adapter: default
+
+local:
+  vhost: "http://vccw.test"
+  wordpress_path: "/var/www/html" # use an absolute path here
+
+  database:
+    name: "wordpress"
+    user: "wordpress"
+    password: "wordpress"
+    host: "localhost"
+    charset: "utf8"
+
+  # paths: # you can customize wordpress internal paths
+  #   wp_config: "wp-config-custom.php"
+  #   wp_content: "wp-content"
+  #   uploads: "wp-content/uploads"
+  #   plugins: "wp-content/plugins"
+  #   mu_plugins: "wp-content/mu-plugins"
+  #   themes: "wp-content/themes"
+  #   languages: "wp-content/languages"
+
+production:
+  vhost: "http://example.com"
+  wordpress_path: "/var/www/your_site" # use an absolute path here
+
+  database:
+    name: "database_name"
+    user: "user"
+    password: "password"
+    host: "host"
+    port: "3308" # Use just in case you have exotic server config
+    mysqldump_options: "--max_allowed_packet=50MB" # Only available if using SSH
+
+  exclude:
+    - ".git/"
+    - ".gitignore"
+    - ".sass-cache/"
+    - "bin/"
+    - "tmp/*"
+    - "Gemfile*"
+    - "movefile.yml"
+    - "wp-config.php"
+    - "wp-content/*.sql"
+
+  ssh:
+    host: "host"
+    user: "user"
+    port: 22
+    rsync_options: --verbose

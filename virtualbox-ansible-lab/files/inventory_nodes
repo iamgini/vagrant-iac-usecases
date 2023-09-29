@@ -1,0 +1,2 @@
+ ansible-lab-node-1 ansible_host=192.168.56.136
+ ansible-lab-node-2 ansible_host=192.168.56.137

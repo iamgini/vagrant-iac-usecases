@@ -1,0 +1,122 @@
+---
+- name: Configure Web server
+  hosts: all
+  become: yes
+  vars_files:
+    - var/main.yml
+  tasks:
+    - name: Create directory for storing our website (/webapp/main-site)
+      become: yes
+      file:
+        path: /webapp/main-site
+        state: directory
+
+    - name: Install nginx server
+      apt: 
+        name: nginx 
+        state: latest
+      #force_apt_get: yes # Force usage of apt-get instead of aptitude
+
+    - name: Start nginx service
+      service:
+        name: nginx
+        state: started
+        enabled: true
+
+    - name: Copy nginx configuration
+      copy:
+        src: static_site.cfg
+        dest: /etc/nginx/sites-available/static_site.cfg
+        mode: 755
+      become: yes
+    
+    - name: Create symlink to activate the site.
+      file:
+        src: /etc/nginx/sites-available/static_site.cfg
+        dest: /etc/nginx/sites-enabled/default
+        state: link
+      become: yes
+
+    - name: Clone website from github
+      git:
+        repo: 'https://github.com/ginigangadharan/demo-website-content.git'
+        dest: /webapp/main-site
+
+    - name: restart nginx to load configuratioins
+      service:
+        name: nginx
+        state: restarted
+      become: yes
+
+    - name: Install ufw (firewall)
+      apt:
+       name: ufw
+       state: latest
+
+    - name: Start Firewall service
+      service:
+        name: ufw
+        state: started
+        enabled: true
+
+    - name: Setup ufw and enable for reboot
+      ufw:
+        state: enabled 
+        policy: deny
+
+    - name: Enable ssh and http ports
+      ufw:
+        rule: allow
+        port: "{{ item }}"
+        proto: tcp
+      with_items:
+        - "{{ ssh_port }}"
+        - "{{ http_port }}"
+
+    # Lockdown ssh access
+    - name: Disallow password authentication
+      lineinfile: 
+        dest: /etc/ssh/sshd_config
+        regexp: "^PasswordAuthentication"
+        line: "PasswordAuthentication no"
+        state: present
+      notify: restart ssh
+
+    - name: Disallow root SSH access
+      lineinfile:
+        dest: /etc/ssh/sshd_config
+        regexp: "^PermitRootLogin"
+        line: "PermitRootLogin no"
+        state: present
+      notify: restart ssh
+
+    - name: Collect Public IP to access
+      uri: 
+        url: http://169.254.169.254/computeMetadata/v1/instance/network-interfaces/0/access-configs/0/external-ip
+        dest: /tmp/abc
+        return_content: yes
+        headers:
+          Metadata-Flavor: "Google"
+      register: instance_meta
+      #notify: show public url
+      
+    - name: Verify website access
+      uri:
+        url: "http://{{ instance_meta.content }}"
+        status_code: 200
+      
+  handlers:
+    - name: restart ssh
+      service:
+        name: sshd
+        state: restarted
+
+# Show Public Hostname/Url to access website
+- name: Display status
+  hosts: all
+  vars_files:
+    - var/main.yml
+  tasks:
+    - name: Show public IP to Access
+      debug:
+        msg: "Your website can be accessed using public IP : http://{{ instance_meta.content }}" #{{ ansible_default_ipv4 }}" # : {{ aws_meta.content }}

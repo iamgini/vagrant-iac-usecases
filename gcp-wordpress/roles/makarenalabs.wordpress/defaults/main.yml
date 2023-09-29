@@ -1,0 +1,14 @@
+---
+wp_version: 5.0.3
+wp_install_dir: '/var/www/html'
+wp_db_name: "{{ wp_mysql_db }}"
+wp_db_user: "{{ wp_mysql_user }}"
+wp_db_password: "{{ wp_mysql_password }}"
+wp_db_host: 'localhost'
+wp_db_charset: 'utf8'
+wp_db_collate: ''
+wp_table_prefix: 'wp_'
+wp_debug: false
+wp_admin_email: 'admin@example.com'
+wp_webserver: nginx
+site_name: "{{ wp_sitename }}"

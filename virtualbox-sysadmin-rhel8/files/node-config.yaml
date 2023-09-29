@@ -1,0 +1,58 @@
+---
+# cofigure kubernetes nodes with users and access
+
+- hosts: all
+  become: true
+
+  vars:
+    local_user_name: ansible
+    local_user_password: ansible
+    key_pair_path: /tmp/id_ssh_rsa
+    remote_user_name: devops
+    remote_user_password: devops
+
+  tasks:
+    - name: Create {{ local_user_name }} user on ansible node
+      user:
+        name: "{{ local_user_name }}"
+        password: "{{ local_user_password }}"
+        #password: "{{ local_user_password | password_hash('sha512') }}"
+        groups: wheel
+        append: yes
+      when: inventory_hostname == 'ansible'
+    
+    - name: Add sudo entries for {{ local_user_name }}
+      copy:
+        content: "{{ local_user_name }} ALL=(ALL) NOPASSWD: ALL"
+        dest: "/etc/sudoers.d/{{ local_user_name }}"
+      when: inventory_hostname == 'ansible'
+    
+    - name: Add .ssh directories
+      file:
+        path: /home/{{ local_user_name }}/.ssh
+        state: directory
+        mode: 0700
+        owner: "{{ local_user_name }}"
+        group: "{{ local_user_name }}"
+      when: inventory_hostname == 'ansible'
+
+    - name: Generate an OpenSSH keypair
+      community.crypto.openssh_keypair:
+        path: "{{ key_pair_path }}"
+        size: 4096
+        type: rsa
+        comment: "ansible@ansible"
+      delegate_to: localhost
+      become: false
+      when: inventory_hostname == 'ansible'
+
+    - name: Copy key-pair to {{ local_user_name }} home
+      copy:
+        src: "{{ item }}"
+        dest: "/home/{{ local_user_name }}/.ssh/{{ item | basename }}"
+        mode: '0600'
+        force: yes
+      with_items:
+        - "{{ key_pair_path }}"
+        - "{{ key_pair_path }}.pub"
+      when: inventory_hostname == 'ansible'

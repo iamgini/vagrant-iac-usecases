@@ -1,0 +1,218 @@
+---
+- hosts: all
+  become: true
+  vars:
+    firewall_ports:
+      - 6443/tcp
+      - 2379:2380/tcp
+      - 10250/tcp
+      - 10259/tcp
+      - 10257/tcp
+      # Opening ports for Calico CNI
+      - 179/tcp
+      - 4789/udp
+      - 4789/tcp
+      - 2379/tcp
+  tasks:
+
+  - name: Installation tasks - {{ ansible_os_family }}
+    include_tasks:        
+      file: "{{ ansible_os_family }}-prep.yaml"
+
+  # - name: Install pip
+  #   shell: |
+  #     wget https://bootstrap.pypa.io/get-pip.py
+  #     python3 get-pip.py
+  # - name: Install python packages
+  #   shell: "python3 -m pip install {{ item }}"
+  #   with_items:
+  #     - firewalld
+  #     - python-firewall
+
+  - name: Configure systemctl
+    copy:
+      content: |
+        net.bridge.bridge-nf-call-iptables  = 1
+        net.ipv4.ip_forward                 = 1
+        net.bridge.bridge-nf-call-ip6tables = 1
+      dest: /etc/sysctl.d/99-kubernetes-cri.conf
+
+  # - name: Open firewall ports    
+  #   firewalld:
+  #     port: "{{ item }}"
+  #     permanent: true
+  #     state: enabled
+  #     immediate: true
+  #   with_items: "{{ firewall_ports }}"
+
+
+      # # Opening ports for Control Plane
+      # sudo ufw allow 6443/tcp
+      # sudo ufw allow 2379:2380/tcp
+      # sudo ufw allow 10250/tcp
+      # sudo ufw allow 10259/tcp
+      # sudo ufw allow 10257/tcp
+
+      # # Opening ports for Calico CNI
+      # sudo ufw allow 179/tcp
+      # sudo ufw allow 4789/udp
+      # sudo ufw allow 4789/tcp
+      # sudo ufw allow 2379/tcp
+
+      
+
+# Step 2.1: Install Docker and its dependent components.
+# We will be installing the following packages, and 
+# then adding a user named “vagrant” to the “docker” group.  
+
+  - name: Configure /etc/modules-load.d/containerd.conf
+    copy:
+      content: |
+        overlay
+        br_netfilter
+      dest: /etc/modules-load.d/containerd.conf
+
+  - name: Reload sysctl config
+    shell: 'sudo sysctl --system'
+
+  - name: Install containerd
+    apt:
+      name:
+        - containerd.io
+
+  - name: Configure containerd
+    shell: "{{ item }}"
+    with_items:
+      - 'mkdir -p /etc/containerd'
+      - 'containerd config default>/etc/containerd/config.toml'
+      - 'sudo systemctl restart containerd'
+
+  # - name: Make sure containerd service is restarted
+  #   systemd:
+  #     state: started
+  #     name: containerd
+
+
+
+
+  - name: Install docker and its dependecies
+    apt: 
+      name: "{{ packages }}"
+      state: present
+      update_cache: yes
+    vars:
+      packages:
+      # - docker-ce 
+      # - docker-ce-cli 
+      - containerd.io
+    notify:
+      - docker status
+
+  # - name: Add vagrant user to docker group
+  #   user:
+  #     name: vagrant
+  #     group: docker
+
+# Step 2.2: Kubelet will not start if the system has swap enabled, 
+# so we are disabling swap using the below code.
+  - name: Remove swapfile from /etc/fstab
+    mount:
+      name: "{{ item }}"
+      fstype: swap
+      state: absent
+    with_items:
+      - swap
+      - none
+
+  - name: Disable swap
+    command: swapoff -a
+    when: ansible_swaptotal_mb > 0      
+
+# Step 2.3: Installing kubelet, kubeadm and kubectl using the below code.
+  - name: Add an apt signing key for Kubernetes
+    apt_key:
+      url: https://packages.cloud.google.com/apt/doc/apt-key.gpg
+      state: present
+
+  - name: Adding apt repository for Kubernetes
+    apt_repository:
+      repo: deb https://apt.kubernetes.io/ kubernetes-xenial main
+      state: present
+      filename: kubernetes.list
+
+  - name: Install Kubernetes binaries
+    apt: 
+      name: "{{ packages }}"
+      state: present
+      update_cache: yes
+    vars:
+      packages:
+        - kubelet 
+        - kubeadm 
+        - kubectl
+
+  - name: Configure node ip
+    lineinfile:
+      #changedthis
+      create: yes
+      path: /etc/default/kubelet
+      line: KUBELET_EXTRA_ARGS=--node-ip={{ node_ip }}
+
+  # - name: Fix cgroup issue
+  #   # https://stackoverflow.com/questions/52119985/kubeadm-init-shows-kubelet-isnt-running-or-healthy
+  #   copy:
+  #     content: |
+  #       {
+  #         "exec-opts": ["native.cgroupdriver=systemd"]
+  #       }
+  #     dest: /etc/docker/daemon.json
+
+  # - name: Restart docker
+  #   service:
+  #     name: docker
+  #     daemon_reload: yes
+  #     state: restarted
+
+  - name: Restart kubelet
+    service:
+      name: kubelet
+      daemon_reload: yes
+      state: restarted
+
+# Step 2.3: Initialize the Kubernetes cluster with kubeadm using the below code (applicable only on controlplane node).
+  - name: Initialize the Kubernetes cluster using kubeadm
+    command: sudo kubeadm init --apiserver-advertise-address={{ apiserver_advertise_address }} --apiserver-cert-extra-sans={{ apiserver_advertise_address }} --node-name=demo-k8s-controlplane --pod-network-cidr=192.168.0.0/16
+
+# Step 2.4: Setup the kube config file for the vagrant user to access the Kubernetes cluster using the below code.
+  - name: Setup kubeconfig for vagrant user
+    command: "{{ item }}"
+    with_items:
+     - mkdir -p /home/vagrant/.kube
+     - cp -i /etc/kubernetes/admin.conf /home/vagrant/.kube/config
+     - chown vagrant:vagrant /home/vagrant/.kube/config
+
+# Step 2.5: Setup the container networking provider and the network policy engine using the below code.
+  - name: Install calico pod network
+    become: false
+    command: kubectl create -f https://docs.projectcalico.org/v3.4/getting-started/kubernetes/installation/hosted/calico.yaml    
+    #changedthis
+    when: installcalico is defined
+
+# Step 2.6: Generate kube join command for joining the node to the Kubernetes cluster and store the command in the file named join-command.
+  - name: Generate join command
+    command: kubeadm token create --print-join-command
+    register: join_command
+
+  - debug:
+      msg: "{{ join_command }}"
+
+  - name: Copy join command to local file
+    #changedthis
+    become: no
+    local_action: copy content="{{ join_command.stdout_lines[0] }}" dest="./join-command"
+
+# Step 2.7: Setup a handler for checking Docker daemon using the below code.
+  # handlers:
+  #   - name: docker status
+  #     service: name=docker state=started
+      

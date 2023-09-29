@@ -1,0 +1,8 @@
+---
+- name: Yum Repo Server Deployment on CentOS Using Vagrant
+  hosts: all
+  tasks:
+    - name: install and enable epel repo 
+      yum: 
+        name: epel-release
+        state: installed

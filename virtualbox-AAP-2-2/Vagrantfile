@@ -1,0 +1,92 @@
+IMAGE_NAME = "generic/rhel8"
+VM_AAP_NAME = "AnsibleController22"
+VM_AAP_HUB_NAME = "AutomationHub22"
+VM_AAP_DB_NAME = "PSQL22"
+VM_AAP_CAT_NAME = "AutomationCat22"
+NODES = 1
+
+Vagrant.configure("2") do |config|
+    config.ssh.insert_key = false
+
+    (1..NODES).each do |i|
+        config.vm.define "#{VM_AAP_NAME}-#{i}" do |node|
+            node.vm.box = IMAGE_NAME
+            #node.vm.network "private_network", ip: "192.168.50.#{i + 20}", virtualbox__intnet: "intnet"
+            node.vm.hostname = "#{VM_AAP_NAME}-#{i}"
+
+            # VM customization
+            node.vm.provider :virtualbox do |vb|
+                vb.name = "#{VM_AAP_NAME}-#{i}"
+                vb.memory = 9096
+                vb.cpus = 4
+            end
+
+            node.vm.provision "ansible" do |ansible|
+                ansible.compatibility_mode = "2.0"
+                ansible.playbook = "files/config.yaml"
+            end
+        end
+    end
+
+    (1..NODES).each do |i|
+       config.vm.define "#{VM_AAP_HUB_NAME}-#{i}" do |node|
+           node.vm.box = IMAGE_NAME
+           #node.vm.network "private_network", ip: "192.168.50.#{i + 20}", virtualbox__intnet: "intnet"
+           node.vm.hostname = "#{VM_AAP_HUB_NAME}-#{i}"
+
+           # VM customization
+           node.vm.provider :virtualbox do |vb|
+               vb.name = "#{VM_AAP_HUB_NAME}-#{i}"
+               vb.memory = 4096
+               vb.cpus = 2
+           end
+
+           node.vm.provision "ansible" do |ansible|
+               ansible.compatibility_mode = "2.0"
+               ansible.playbook = "files/config.yaml"
+           end
+       end
+    end
+
+    (1..NODES).each do |i|
+        config.vm.define "#{VM_AAP_DB_NAME}-#{i}" do |node|
+            node.vm.box = IMAGE_NAME
+            #node.vm.network "private_network", ip: "192.168.50.#{i + 20}", virtualbox__intnet: "intnet"
+            node.vm.hostname = "#{VM_AAP_DB_NAME}-#{i}"
+ 
+            # VM customization
+            node.vm.provider :virtualbox do |vb|
+                vb.name = "#{VM_AAP_DB_NAME}-#{i}"
+                vb.memory = 4096
+                vb.cpus = 2
+            end
+
+            node.vm.provision "ansible" do |ansible|
+                ansible.compatibility_mode = "2.0"
+                ansible.playbook = "files/config.yaml"
+            end            
+        end
+     end
+     
+     (1..NODES).each do |i|
+        config.vm.define "#{VM_AAP_CAT_NAME}-#{i}" do |node|
+            node.vm.box = IMAGE_NAME
+            #node.vm.network "private_network", ip: "192.168.50.#{i + 20}", virtualbox__intnet: "intnet"
+            node.vm.hostname = "#{VM_AAP_CAT_NAME}-#{i}"
+
+            # VM customization
+            node.vm.provider :virtualbox do |vb|
+                vb.name = "#{VM_AAP_CAT_NAME}-#{i}"
+                vb.memory = 9096
+                vb.cpus = 4
+            end
+
+            node.vm.provision "ansible" do |ansible|
+                ansible.compatibility_mode = "2.0"
+                ansible.playbook = "files/config.yaml"
+            end
+        end
+    end
+
+        
+end

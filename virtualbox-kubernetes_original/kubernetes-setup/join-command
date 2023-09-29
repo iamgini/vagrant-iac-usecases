@@ -1,0 +1,1 @@
+kubeadm join 192.168.56.50:6443 --token kekzuw.sedixjv1e91263a1 --discovery-token-ca-cert-hash sha256:28df81351b1d4cfb92031c4a51fe042761fe83c9db21709d347bbf5fa4a566a1 

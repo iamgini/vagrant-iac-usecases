@@ -1,0 +1,11 @@
+#vagrant working directory
+*/.vagrant
+
+*/.minikube
+*/.kube
+*/.ansible
+*/.vagrant
+*/bin
+*/.bash_history
+*/.bashrc
+*/.viminfo
