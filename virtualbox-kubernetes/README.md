@@ -1,5 +1,7 @@
 # kubernetes cluster with Vagrant and Ansible
 
+Read the full guide here: [Multi-node Kubernets Cluster in 10 minutes](https://www.techbeatly.com/kubernets-cluster-in-10-minutes/)
+
 ```shell
 ## clone the repo
 $ git clone https://github.com/ginigangadharan/vagrant-iac-usecases
