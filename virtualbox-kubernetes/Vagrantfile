@@ -1,4 +1,5 @@
 #IMAGE_NAME = "bento/ubuntu-16.04"
+
 IMAGE_NAME = "bento/ubuntu-20.04"
 CONTROLPLANE_NODES = 1
 COMPUTE_NODES = 3
