@@ -1,8 +1,6 @@
 # Installing minikube with Vagrant and Ansible
 
-**IMPORTANCE NOTE**
-
-Since the minikube support the several drivers (Including podman, virtualbox, docker etc), I have stopped using minikube inside a Vagrant+VirtualBox VM. Hence I am not maintaining this Vagrant use case folder as well.
+> __IMPORTANCE NOTE__: Since the minikube support the several drivers (Including podman, virtualbox, docker etc), I have stopped using minikube inside a Vagrant+VirtualBox VM. Hence I am not maintaining this Vagrant use case folder as well.
 
 ```
 ## Install minikube
@@ -19,10 +17,36 @@ $ minikube kubectl -- get pods -A
 $ minikube dashboard
 
 ## Stop the minikube VM
-$ minikube sto
+$ minikube stop
 ```
 
-## Old method using the Vagrant + VirtualBox
+## Start Another minikube!
+
+Yes, you can create multiple Kubernetes clusters using minikube but remember to give different name (`--profile`).
+
+```shell
+# Start a minikube cluster using Podman as driver.
+$ minikube start --profile cluster2-podman --driver=podman
+
+# Stop cluster
+$ minikube stop --profile cluster2-podman
+
+# Remove the cluster
+$ minikube delete --profile cluster2-podman
+```
+
+## Multi-node Kubernetes Cluster using minikube
+
+```shell
+$ minikube start --driver=virtualbox --nodes 2
+
+$ kubectl get nodes
+NAME           STATUS     ROLES           AGE   VERSION
+minikube       Ready      control-plane   95s   v1.26.3
+minikube-m02   NotReady   <none>          8s    v1.26.3
+```
+
+## NOT in USE: Old method using the Vagrant + VirtualBox
 
 This is a simple repo to demonstrate how to install minikube inside a virtualbox vm using Vagrant and Ansible as provisioner. 
 

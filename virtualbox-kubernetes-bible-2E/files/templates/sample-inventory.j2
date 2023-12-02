@@ -1,0 +1,12 @@
+[ansible]
+{{hostvars['localhost']['inventory_content_control'] | default('') }}
+
+[nodes]
+{{hostvars['localhost']['inventory_content_nodes'] | default('') }}
+
+[all:vars]
+ansible_user=vagrant
+ansible_password=vagrant
+ansible_connection=ssh
+ansible_ssh_private_key_file= /home/vagrant/.ssh/id_rsa
+ansible_ssh_extra_args= ' -o StrictHostKeyChecking=no -o PreferredAuthentications=password '

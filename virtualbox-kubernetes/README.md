@@ -1,6 +1,6 @@
-# kubernetes cluster with Vagrant and Ansible
+# Kubernetes cluster with Vagrant and Ansible
 
-Read the full guide here: [Multi-node Kubernets Cluster in 10 minutes](https://www.techbeatly.com/kubernets-cluster-in-10-minutes/)
+Read the full guide here: [Multi-node Kubernetes Cluster in 10 minutes](https://www.techbeatly.com/kubernets-cluster-in-10-minutes/)
 
 ```shell
 ## clone the repo
@@ -11,7 +11,10 @@ $ cd virtualbox-kubernetes
 
 ## create cluster
 $ vagrant up
+```
+Wait for nodes to power on and install packages (5-10 min depends on your configuration)
 
+```shell
 ## chcek status
 $ vagrant status
 Current machine states:
@@ -20,8 +23,6 @@ controlplane              running (virtualbox)
 compute-1                 running (virtualbox)
 compute-2                 running (virtualbox)
 ```
-
-Wait for nodes to power on and install packages (5-10 min depends on your configuration)
 
 ## Access the Cluster
 
