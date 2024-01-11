@@ -1,6 +1,6 @@
 # Ansible Lab using Vagrant and VirtualBox
 
-A simple Vagrantfile to provision multi-node Lab for practicing.
+A simple Vagrantfile to provision multi-node Kubernetes Lab for practicing.
 
 ## Features
 

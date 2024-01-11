@@ -1,6 +1,6 @@
 # Installing minikube with Vagrant and Ansible
 
-> __IMPORTANCE NOTE__: Since the minikube support the several drivers (Including podman, virtualbox, docker etc), I have stopped using minikube inside a Vagrant+VirtualBox VM. Hence I am not maintaining this Vagrant use case folder as well.
+> __IMPORTANCE NOTE__: Since the minikube support the several drivers (Including podman, virtualbox, docker etc), I have stopped using minikube inside a Vagrant + VirtualBox VM. Hence I am not maintaining this Vagrant use case folder as well.
 
 ```
 ## Install minikube
