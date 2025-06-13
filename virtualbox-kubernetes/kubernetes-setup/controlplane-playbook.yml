@@ -1,0 +1,77 @@
+---
+- hosts: all
+  become: true
+  vars_files:
+    - variables.yaml
+  tasks:
+
+  - name: Configure repo and update system
+    include_tasks:
+      file: 01-repo-config.yaml
+
+  - name: Configure system
+    include_tasks:
+      file: 02-configure-system.yaml
+
+  - name: Install packages
+    include_tasks:
+      file: 03-configure-packages.yaml
+
+  - name: Disable swap
+    include_tasks:
+      file: 04-disable-swap.yaml
+
+  - name: Install k8s tools
+    include_tasks:
+      file: 05-install-k8s-tools.yaml
+
+  - name: Configure node ip
+    lineinfile:
+      #changedthis
+      create: yes
+      path: /etc/default/kubelet
+      line: KUBELET_EXTRA_ARGS=--node-ip={{ node_ip }}
+
+  - name: Restart kubelet
+    service:
+      name: kubelet
+      daemon_reload: yes
+      state: restarted
+
+# Step 2.3: Initialize the Kubernetes cluster with kubeadm using the below code (applicable only on controlplane node).
+  - name: Initialize the Kubernetes cluster using kubeadm
+    command: sudo kubeadm init --apiserver-advertise-address={{ apiserver_advertise_address }} --apiserver-cert-extra-sans={{ apiserver_advertise_address }} --node-name=demo-k8s-controlplane --pod-network-cidr=192.168.0.0/16
+
+# Step 2.4: Setup the kube config file for the vagrant user to access the Kubernetes cluster using the below code.
+  - name: Setup kubeconfig for vagrant user
+    command: "{{ item }}"
+    with_items:
+     - mkdir -p /home/vagrant/.kube
+     - cp -i /etc/kubernetes/admin.conf /home/vagrant/.kube/config
+     - chown vagrant:vagrant /home/vagrant/.kube/config
+
+# Step 2.5: Setup the container networking provider and the network policy engine using the below code.
+  - name: Install calico pod network
+    become: false
+    command: kubectl create -f https://docs.projectcalico.org/v3.4/getting-started/kubernetes/installation/hosted/calico.yaml
+    #changedthis
+    when: installcalico is defined
+
+# Step 2.6: Generate kube join command for joining the node to the Kubernetes cluster and store the command in the file named join-command.
+  - name: Generate join command
+    command: kubeadm token create --print-join-command
+    register: join_command
+
+  - debug:
+      msg: "{{ join_command }}"
+
+  - name: Copy join command to local file
+    #changedthis
+    become: no
+    local_action: copy content="{{ join_command.stdout_lines[0] }}" dest="./join-command"
+
+# Step 2.7: Setup a handler for checking Docker daemon using the below code.
+  # handlers:
+  #   - name: docker status
+  #     service: name=docker state=started
+      

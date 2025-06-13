@@ -1,0 +1,10 @@
+- name: Install Packages
+  dnf:
+    name:
+      - cri-o
+      - apt-transport-https
+      - ca-certificates
+      - curl
+      - gnupg-agent
+      - software-properties-common
+    state: latest

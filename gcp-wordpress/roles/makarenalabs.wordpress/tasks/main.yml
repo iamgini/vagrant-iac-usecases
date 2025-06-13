@@ -1,0 +1,127 @@
+---
+- name: Wordpress | Install php
+  apt:
+    pkg: ['php-pear', 'php-fpm', 'php-dev', 'php-zip', 'php-curl',
+          'php-xmlrpc', 'php-gd', 'php-mysql', 'php-mbstring', 'php-xml']
+    update_cache: yes
+    cache_valid_time: 86400
+    state: present
+
+- name: Wordpress | Install nginx
+  apt:
+    pkg: nginx
+    update_cache: yes
+    cache_valid_time: 86400
+    state: present
+  when: wp_webserver == "nginx"
+
+- name: Wordpress | Install apache
+  apt:
+    pkg: ['apache2', 'libapache2-mod-php']
+    update_cache: yes
+    cache_valid_time: 86400
+    state: present
+  when: wp_webserver == "apache"
+
+- name: Wordpress | Remove elements from /var/www/html/
+  file:
+    path: /var/www/html/index.html
+    state: absent
+  when:
+    wp_install_dir == "/var/www/html"
+
+- name: Wordpress | Create directory
+  file:
+    path: "{{ wp_install_dir }}"
+    state: directory
+    mode: 0755
+
+- name: Wordpress | Extract archive in {{ wp_install_dir }}
+  unarchive:
+    src: "http://wordpress.org/wordpress-{{ wp_version }}.tar.gz"
+    dest: "{{ wp_install_dir }}"
+    remote_src: yes
+
+- name: Wordpress | Move files from {{ wp_install_dir }}/wordpress to {{ wp_install_dir }}
+  command: cp -rf . "{{ wp_install_dir }}"
+  args:
+    chdir: "{{ wp_install_dir }}/wordpress/"
+
+- name: Wordpress | Remove wordpress dir
+  file:
+    path: "{{ wp_install_dir }}/wordpress/"
+    state: absent
+
+- name: Wordpress | Fetch random salts for wp-config.php
+  delegate_to: localhost
+  uri:
+    url: https://api.wordpress.org/secret-key/1.1/salt/
+    return_content: yes
+  become: False
+  register: 'wp_salt_array'
+
+- name: set wp_salt fact
+  set_fact:
+    wp_salt: '{{ wp_salt_array.content }}'
+
+- name: Wordpress | Copy wp-config.php file
+  template:
+    src: wp-config.php.j2
+    dest: "{{ wp_install_dir }}/wp-config.php"
+
+- name: Wordpress | Change ownership of installation directory
+  file:
+    path: "{{ wp_install_dir }}"
+    owner: www-data
+    group: www-data
+    state: directory
+    recurse: yes
+
+- include: nginx.yml
+  when: wp_webserver == "nginx"
+
+- include: apache.yml
+  when: wp_webserver == "apache"
+
+- name: Installing mysql-server
+  apt:
+    pkg: mysql-server
+    update_cache: yes
+    cache_valid_time: 86400
+    state: present
+  when: ansible_distribution == 'Ubuntu'
+
+- name: Installing mariadb-server
+  apt:
+    pkg: mariadb-server
+    update_cache: yes
+    cache_valid_time: 86400
+    state: present
+  when: ansible_distribution == 'Debian'
+
+- name: Start MariaDB
+  service:
+    name: mysql
+    state: started
+
+- name: Installing dependencies
+  apt:
+    pkg: [ 'php-mysql', 'python3-pymysql' ]
+    update_cache: yes
+    cache_valid_time: 86400
+    state: present
+  notify:
+    - restart {{ wp_webserver }}
+
+- name: Create mysql database
+  mysql_db:
+    name: "{{ wp_mysql_db }}"
+    state: present
+    login_unix_socket: /var/run/mysqld/mysqld.sock
+
+- name: Create mysql user
+  mysql_user:
+    name: "{{ wp_mysql_user }}"
+    password: "{{ wp_mysql_password }}"
+    priv: '*.*:ALL'
+    login_unix_socket: /var/run/mysqld/mysqld.sock

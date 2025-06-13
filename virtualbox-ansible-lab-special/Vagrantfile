@@ -1,0 +1,101 @@
+# IMAGE_NAME = "generic/rhel8"
+IMAGE_NAME = "fedora/38-cloud-base"
+ANSIBLE_VM_NAME = "ansible-lab-control"
+REMOTE_NODES_NAME = "ansible-lab-node"
+ANSIBLE_NODES = 2
+
+## only needed if you are using ansible engine vm with bridged network
+#ANSILBE_ENGINE_IP = "192.168.1.185"
+
+Vagrant.configure("2") do |config|
+    config.ssh.insert_key = false
+    
+    # loop to create managed nodes
+    (1..ANSIBLE_NODES).each do |i|
+        config.vm.define "remote-node-#{i}" do |remotenode|
+            remotenode.vm.box = IMAGE_NAME
+            remotenode.vm.network "private_network", ip: "192.168.100.#{i + 100}", virtualbox__intnet: "intnet"
+            #remotenode.vm.network "private_network", ip: "192.168.100.4", virtualbox__intnet: "intnet"
+           
+            remotenode.vm.hostname = "#{REMOTE_NODES_NAME}-#{i}"
+
+            # naming the virtualmachine
+            remotenode.vm.provider :virtualbox do |vb|
+                vb.name = "#{REMOTE_NODES_NAME}-#{i}"
+                vb.memory = 512
+                vb.cpus = 1
+                #vb.customize ["modifyvm", :id, "--nat-network3", "NatNetwork"]
+                # enable gui as MacOS Monterey got issue with headless vm
+                # https://github.com/hashicorp/vagrant/issues/12557
+                #vb.gui = true
+            end
+
+            # provisioning
+            # adding host ssh key for direct ssh login
+            remotenode.vm.provision "file", source: "~/.ssh/id_rsa.pub", destination: "host_ssh_public_key"
+            remotenode.vm.provision "shell", inline: <<-SHELL
+                cat host_ssh_public_key >> /home/vagrant/.ssh/authorized_keys
+            SHELL
+        
+            remotenode.vm.provision :shell, path: "files/engine-config.sh"
+        end
+    end
+
+    # create ansible controlnode
+    config.vm.define "ansible" do |ansible|
+        ansible.vm.box = IMAGE_NAME
+        #ansible.vm.network "private_network", ip: "192.168.100.10", virtualbox__intnet: "intnet"
+        #ansible.vm.network "private_network", ip: "192.168.56.10", virtualbox__intnet: "intnet"
+        ansible.vm.network "private_network", ip: "192.168.100.100", virtualbox__intnet: "intnet"
+        
+        ## Below interface has been disables as different machines will have different bridge interface.
+        ## You can enable this back and use for additional bridged interface on ansible engine node.
+        ## Choose options 1, 2 or 3 when it prompts, depends on the actual network interface on your laptop/workstation.
+        #ansible.vm.network "public_network", ip: ANSILBE_ENGINE_IP
+        
+        ansible.vm.hostname = ANSIBLE_VM_NAME
+
+        # naming the virtualmachine
+        ansible.vm.provider :virtualbox do |vb|
+            vb.name = ANSIBLE_VM_NAME
+            vb.memory = 1024
+            vb.cpus = 1
+            #vb.customize ["modifyvm", :id, "--nat-network3", "NatNetwork"]
+            # enable gui as MacOS Monterey got issue with headless vm
+            # https://github.com/hashicorp/vagrant/issues/12557
+            #vb.gui = true
+        end
+        
+        # folder sync
+        #config.vm.synced_folder "~/workarea/ansible-book/", "/home/ansible/ansible-book", create: true
+        # owner: "ansible", group: "ansible"
+
+        #--------------- provisioning ---------------
+        # adding host ssh key for direct ssh login
+        ansible.vm.provision "file", source: "~/.ssh/id_rsa.pub", destination: "host_ssh_public_key"
+        ansible.vm.provision "shell", inline: <<-SHELL
+            cat host_ssh_public_key >> /home/vagrant/.ssh/authorized_keys
+        SHELL
+        
+        # copy playbook content
+        #config.vm.provision "file", source: "~/workarea/ansible-book/", destination: "$HOME/ansible-book"
+        # execute nodes-sshd.sh for configuring ssh.
+        ansible.vm.provision :shell, path: "files/engine-config.sh"
+        
+        # 1. Expecting the project directory conte available at /vagrant.
+        # 2. Using ansible_local to avoid any additional ansible requirement on
+        #    host machine (eg: Windows). Vagrant will install ansible on target machine
+        #    and complete the initial configuration.
+        ansible.vm.provision "ansible" do |ansible|
+            ansible.compatibility_mode = "2.0"
+            ansible.playbook = "files/engine-config.yaml"
+            #ansible.extra_vars = {
+            #    node_ip: "192.168.100.10",
+            #}
+        end
+        
+        # execute nodes-init.yaml for configuring other ansible nodes.
+        ## disabled for engine only setup
+        ## ansible.vm.provision :shell, path: "files/nodes-init-playbook.sh"
+    end
+end

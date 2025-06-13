@@ -1,0 +1,47 @@
+- name: Configure systemctl
+  copy:
+    content: |
+      net.bridge.bridge-nf-call-iptables  = 1
+      net.ipv4.ip_forward                 = 1
+      net.bridge.bridge-nf-call-ip6tables = 1
+    dest: /etc/sysctl.d/99-kubernetes-cri.conf
+    
+- name: Load the br_netfilter & overlay module 
+  shell: |
+    sudo modprobe overlay
+    sudo modprobe br_netfilter
+
+- name: Configure /etc/modules-load.d/containerd.conf
+  copy:
+    content: |
+      overlay
+      br_netfilter
+    dest: /etc/modules-load.d/containerd.conf
+    mode: '0644'
+    
+- name: Reload sysctl config
+  shell: 'sudo sysctl --system'
+
+
+  # - name: Open firewall ports
+  #   firewalld:
+  #     port: "{{ item }}"
+  #     permanent: true
+  #     state: enabled
+  #     immediate: true
+  #   with_items: "{{ firewall_ports }}"
+
+- name: Open firewall ports
+  # shell: 'sudo systemctl disable ufw'
+  shell: |
+    # Opening ports for Control Plane
+    sudo ufw allow 6443/tcp
+    sudo ufw allow 2379:2380/tcp
+    sudo ufw allow 10250/tcp
+    sudo ufw allow 10259/tcp
+    sudo ufw allow 10257/tcp
+    # Opening ports for Calico CNI
+    sudo ufw allow 179/tcp
+    sudo ufw allow 4789/udp
+    sudo ufw allow 4789/tcp
+    sudo ufw allow 2379/tcp

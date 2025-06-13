@@ -1,0 +1,13 @@
+# Step 2.2: Kubelet will not start if the system has swap enabled, 
+# so we are disabling swap using the below code.
+- name: Remove swapfile from /etc/fstab
+  mount:
+    name: "{{ item }}"
+    fstype: swap
+    state: absent
+  with_items:
+    - swap
+    - none
+- name: Disable swap
+  command: swapoff -a
+  when: ansible_swaptotal_mb > 0

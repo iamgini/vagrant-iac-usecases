@@ -1,0 +1,156 @@
+---
+# cofigure kubernetes nodes with users and access
+
+- name: Post-provisioning configurations
+  hosts: all
+  become: true
+
+  vars:
+    remote_user_name: vagrant
+    key_pair_path: './id_rsa'
+    etc_host_file: "./etc-hosts"
+    inventory_file_nodes: "./inventory_nodes"
+    inventory_file_control: "./inventory_control"
+
+  tasks:
+    - name: Configurations
+      block:
+        - name: Disable SELinux
+          ansible.posix.selinux:
+            state: disabled
+
+        - name: Collect IP Address of nodes
+          ansible.builtin.lineinfile:
+            path: "{{ etc_host_file }}"
+            line: "{{ ansible_all_ipv4_addresses | select('match', '192.168.56.*') | list | first  }} {{ ansible_hostname }}"
+            create: true
+            mode: '0644'
+          delegate_to: localhost
+          become: false
+
+        - name: Collect remote node info for inventory
+          ansible.builtin.lineinfile:
+            path: "{{ inventory_file_nodes }}"
+            line: " {{ ansible_hostname }} ansible_host={{ ansible_all_ipv4_addresses | select('match', '192.168.56.*') | list | first  }}"
+            create: true
+            mode: '0644'
+          delegate_to: localhost
+          become: false
+          when: inventory_hostname != 'ansible-lab-control'
+
+        - name: Collect control node info for inventory
+          ansible.builtin.lineinfile:
+            path: "{{ inventory_file_control }}"
+            line: " {{ ansible_hostname }} ansible_host={{ ansible_all_ipv4_addresses | select('match', '192.168.56.*') | list | first  }} ansible_connection=local"
+            create: true
+            mode: '0644'
+          delegate_to: localhost
+          become: false
+          when: inventory_hostname == 'ansible-lab-control'
+
+        - name: Check key pair exists - {{ key_pair_path }}
+          ansible.builtin.stat:
+            path: "{{ key_pair_path }}"
+          register: key_pair_stat
+
+        - name: Generate an OpenSSH keypair
+          community.crypto.openssh_keypair:
+            path: "{{ key_pair_path }}"
+            size: 4096
+            type: rsa
+            comment: "ansible@ansible"
+          delegate_to: localhost
+          become: false
+          when:
+            # - inventory_hostname == 'ansible-lab-control'
+            - not key_pair_stat.stat.exists
+
+        - name: Copy key-pair to {{ remote_user_name }}
+          ansible.builtin.copy:
+            src: "{{ item }}"
+            dest: "/home/{{ remote_user_name }}/.ssh/{{ item | basename }}"
+            mode: '0600'
+            owner: "{{ remote_user_name }}"
+            group: "{{ remote_user_name }}"
+            force: true
+          with_items:
+            - "{{ key_pair_path }}"
+            - "{{ key_pair_path }}.pub"
+          when: inventory_hostname == 'ansible-lab-control'
+
+        - name: Add SSH key to managed nodes
+          ansible.posix.authorized_key:
+            user: "{{ remote_user_name }}"
+            key: "{{ lookup('file', key_pair_path + '.pub') }}"
+            # key: "{{ key_pair_path }}.pub"
+            manage_dir: true
+          # when: remote_user_public_key is defined
+
+        - name: Copy Sample files to control node
+          ansible.builtin.copy:
+            src: "{{ item }}"
+            dest: "./{{ item }}"
+            mode: '0755'
+            force: true
+            # remote_src: true
+          with_items:
+            # - "sample-inventory"
+            - "ansible.cfg"
+          when: inventory_hostname == 'ansible-lab-control'
+
+        - name: Install Packages
+          ansible.builtin.yum:
+            name:
+              - git
+              - vim
+              - ansible
+              - sshpass
+            state: present
+          when: inventory_hostname == 'ansible-lab-control'
+
+        - name: "Read content from local files"
+          ansible.builtin.set_fact:
+            etc_host_content: "{{ lookup('file', etc_host_file) }}"
+            inventory_content_nodes: "{{ lookup('file', inventory_file_nodes) }}"
+            inventory_content_control: "{{ lookup('file', inventory_file_control) }}"
+          delegate_to: localhost
+          delegate_facts: true
+          become: false
+          when: inventory_hostname == 'ansible-lab-control'
+
+        - name: Update /etc/hosts with node entries
+          ansible.builtin.blockinfile:
+            path: /etc/hosts
+            block: "{{ hostvars['localhost']['etc_host_content'] }}"
+          when: inventory_hostname == 'ansible-lab-control'
+
+        - name: Create sample inventory
+          ansible.builtin.template:
+            src: "sample-inventory.j2"
+            dest: "./sample-inventory"
+            owner: "{{ remote_user_name }}"
+            group: "{{ remote_user_name }}"
+            mode: '0644'
+          when: inventory_hostname == 'ansible-lab-control'
+
+      always:
+        - name: Housekeeping local files
+          delegate_to: localhost
+          become: false
+          ansible.builtin.file:
+            path: "{{ item }}"
+            state: absent
+          with_items:
+            - "{{ key_pair_path }}"
+            - "{{ key_pair_path }}.pub"
+            - "{{ etc_host_file }}"
+            - "{{ inventory_file_nodes }}"
+            - "{{ inventory_file_control }}"
+          when: inventory_hostname == 'ansible-lab-control'
+
+        - name: Housekeeping remote files
+          ansible.builtin.file:
+            path: "{{ item }}"
+            state: absent
+          with_items:
+            - "/home/vagrant/virtualbox-ansible-lab/"

@@ -1,0 +1,121 @@
+---
+- name: Configure Ansible AWX Server
+  hosts: all
+  become: yes
+  vars_files:
+    - var/main.yml
+  tasks:
+    - name: Install epel repo      
+      yum:
+        name: epel-release
+        state: latest
+
+    - name: Install jq, yum-utils, lvm2, device-mapper-persistent-data
+      yum: 
+        name: "{{ item }}" 
+        state: latest
+      with_items:
+        - jq
+        - yum-utils
+        - device-mapper-persistent-data
+        - lvm2
+        
+    - name: Add and enable docker-ce repo
+      get_url:
+        url: https://download.docker.com/linux/centos/docker-ce.repo
+        dest: /etc/yum.repos.d/docer-ce.repo
+      become: yes
+    
+    - name: Enable Docker Edge repo
+      ini_file:
+        dest: /etc/yum.repos.d/docer-ce.repo
+        section: 'docker-ce-edge'
+        option: enabled
+        value: 0
+      become: yes
+    
+    - name: Enable Docker Test repo
+      ini_file:
+        dest: /etc/yum.repos.d/docer-ce.repo
+        section: 'docker-ce-test'
+        option: enabled
+        value: 0
+      become: yes
+
+    - name: Install Docker-CE
+      package:
+        name: docker-ce
+        state: latest
+      become: yes
+
+    - name: Start and Enable Docker service
+      service:
+        name: docker
+        state: started
+        enabled: yes
+      become: yes
+
+    - name: Start Firewall service
+      service:
+        name: firewalld
+        state: started
+        enabled: true
+
+    - name: Enable ssh and http ports
+      firewalld:
+        service: "{{ item }}"
+        permanent: yes
+        immediate: yes
+        state: enabled
+      with_items:
+        - "{{ ssh_port }}"
+        - "{{ http_port }}"
+        - "{{ https_port }}"
+
+    # Lockdown ssh access
+    - name: Disallow password authentication
+      lineinfile: 
+        dest: /etc/ssh/sshd_config
+        regexp: "^PasswordAuthentication"
+        line: "PasswordAuthentication no"
+        state: present
+      notify: restart ssh
+
+    - name: Disallow root SSH access
+      lineinfile:
+        dest: /etc/ssh/sshd_config
+        regexp: "^PermitRootLogin"
+        line: "PermitRootLogin no"
+        state: present
+      notify: restart ssh
+
+    - name: Collect Public IP to access
+      uri: 
+        url: http://169.254.169.254/computeMetadata/v1/instance/network-interfaces/0/access-configs/0/external-ip
+        dest: /tmp/abc
+        return_content: yes
+        headers:
+          Metadata-Flavor: "Google"
+      register: instance_meta
+      #notify: show public url
+      
+    - name: Verify website access
+      uri:
+        url: "http://{{ instance_meta.content }}"
+        status_code: 200
+      
+  handlers:
+    - name: restart ssh
+      service:
+        name: sshd
+        state: restarted
+
+# Show Public Hostname/Url to access website
+- name: Display status
+  hosts: all
+  vars_files:
+    - var/main.yml
+  tasks:
+    - name: Show public IP to Access
+      debug:
+        msg: "Your website can be accessed using public IP : http://{{ instance_meta.content }}" #{{ ansible_default_ipv4 }}" # : {{ aws_meta.content }}

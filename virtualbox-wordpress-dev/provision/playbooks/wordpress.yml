@@ -1,0 +1,230 @@
+---
+- hosts: all
+  vars:
+    path: "{{ vccw.document_root }}/{{ vccw.wp_siteurl }}"
+    user: "{{ ansible_env.USER | default( 'ubuntu' ) }}"
+
+  tasks:
+
+  # Database Settings
+  - name: Create Database
+    mysql_db:
+      login_user: root
+      name: "{{ vccw.db_name }}"
+      state: present
+
+  - name: Create MySQL user
+    mysql_user:
+      login_user: root
+      name: "{{ vccw.db_user }}"
+      password: "{{ vccw.db_pass }}"
+      priv: "{{ vccw.db_name }}.*:ALL"
+      host: "%"
+      state: present
+
+  - name: "Change owner of the {{ path }}"
+    become: yes
+    file:
+      path: "{{ path }}"
+      state: directory
+      owner: "{{ user }}"
+      group: "{{ user }}"
+      recurse: yes
+
+  - name: "Remove index.html from document root"
+    become: yes
+    file:
+      path: "{{ path }}/index.html"
+      state: absent
+
+  # download wordpress
+  - name: Run `wp core download`
+    command: |
+      wp core download
+      --path={{ path }}
+      --version={{ vccw.version }}
+      --force
+
+  # wp-config.php
+  - name: Create temporary file for extra-php in wp-config.php
+    template:
+      src: templates/extra-wp-config.php
+      dest: "/tmp/extra-wp-config.php"
+  - name: Run `wp core config`
+    shell: |
+       wp core config \
+       --force \
+       --path={{ path }} \
+       --dbhost={{ vccw.db_host }} \
+       --dbname={{ vccw.db_name }} \
+       --dbuser={{ vccw.db_user }} \
+       --dbpass={{ vccw.db_pass }} \
+       --dbprefix={{ vccw.db_prefix }} \
+       --locale={{ vccw.lang }} \
+       --extra-php < /tmp/extra-wp-config.php
+
+  # Reset Database
+  - name: Run `wp db reset`
+    command: wp db reset --yes --path={{ path }}
+    when: vccw.reset_db_on_provision
+
+  # install wordpress
+  - name: Run `wp core install`
+    command: |
+      wp core install
+      --path={{ path }}
+      --url=http://{{ vccw.hostname }}/{{ vccw.wp_siteurl }}
+      --title='{{ vccw.title }}'
+      --admin_user={{ vccw.admin_user }}
+      --admin_password={{ vccw.admin_pass }}
+      --admin_email={{ vccw.admin_email }}
+
+  - name: Create index.php for wp_siteurl
+    when: vccw.wp_siteurl != ''
+    template:
+      src: templates/index.php
+      dest: /tmp/index.php
+  - name: Move index.php for wp_siteurl
+    when: vccw.wp_siteurl != ''
+    command: "mv /tmp/index.php {{ vccw.document_root }}/index.php"
+
+  - stat:
+      path: "{{ path }}/.gitignore"
+    register: st
+  - name: Create `.gitignore`
+    get_url:
+      url: "{{ vccw.gitignore }}"
+      dest: /tmp/.gitignore
+      mode: 0644
+      force: yes
+    when: st.stat.exists != true
+  - name: Move `.gitignore`
+    command: "mv /tmp/.gitignore {{ path }}/.gitignore"
+    when: st.stat.exists != true
+
+  - name: Run `wp core language install`
+    command: |
+      wp core language install {{ vccw.lang }}
+      --path={{ path }}
+      --activate
+
+  # Install Plugins
+  - name: Run `wp plugin install`
+    command: |
+      wp plugin install {{ item }}
+      --activate
+      --path={{ path }}
+      --force
+    with_items: "{{ vccw.plugins | default([]) }}"
+
+  # Install wp-multibyte-patch
+  - name: Run `wp plugin install wp-multibyte-patch`
+    command: |
+      wp plugin install wp-multibyte-patch
+      --activate
+      --path={{ path }}
+      --force
+    when: vccw.lang == 'ja'
+
+  # Install Theme
+  - name: Run `wp theme install`
+    command: |
+      wp theme install {{ vccw.theme }}
+      --path={{ path }} --activate --force
+    when: vccw.theme != ''
+
+  # Import Theme Unit Test Data
+  - name: Install `wordpress-importer`
+    command: |
+      wp plugin install https://github.com/WordPress/wordpress-importer/archive/master.zip
+      --activate
+      --path={{ path }}
+      --force
+    when: vccw.theme_unit_test
+  - name: Download WordPress theme unit test data
+    when: vccw.theme_unit_test
+    get_url:
+      url: "{{ vccw.theme_unit_test_uri }}"
+      dest: "/tmp/theme-unit-test-data.xml"
+  - name: Import WordPress theme unit test data
+    when: vccw.theme_unit_test
+    command: |
+      wp import
+      /tmp/theme-unit-test-data.xml
+      --authors=create
+      --path={{ path }}
+
+  # Import Options
+  - name: Run `wp options update`
+    command: |
+      wp option update {{ item.key }} '{{ item.value }}'
+      --path={{ path }}
+    with_dict: "{{ vccw.options }}"
+
+  # Localization
+  - name: Get the timezone
+    command: |
+      wp eval "echo _x( '0', 'default GMT offset or timezone string' );"
+      --path={{ path }}
+    register: timezone
+  - name: Update timezone
+    command: |
+      wp option update timezone_string '{{ timezone.stdout }}'
+      --path={{ path }}
+
+  - name: Get the date format
+    command: |
+      wp eval "echo __( 'M jS Y' );"
+      --path={{ path }}
+    register: date_format
+  - name: Update date format
+    command: |
+      wp option update date_format '{{ date_format.stdout }}'
+      --path={{ path }}
+
+  # Setting Permalink
+  - name: Run `wp rewrite structure`
+    command: |
+      wp rewrite structure {{ vccw.rewrite_structure }}
+      --path={{ path }}
+  - name: Flush rewrite rules
+    command: |
+      wp rewrite flush
+      --hard
+      --path={{ path }}
+
+ # multisite Settings
+  - name: Run `wp core multisite-convert`
+    when: vccw.multisite
+    command: |
+      wp core multisite-convert
+      --path={{ path }}
+  - name: Create `.htaccess` for multisite
+    when: vccw.multisite
+    template:
+      src: templates/multisite-htaccess
+      dest: /tmp/.htaccess
+  - name: Move `.htaccess` for multisite
+    when: vccw.multisite
+    command: "mv /tmp/.htaccess {{ vccw.document_root }}/.htaccess"
+  - name: Setting up Wordpress multisite options
+    command: |
+      wp network meta update 1 {{ item.key }} '{{ item.value }}'
+      --path={{ path }}
+    with_dict: "{{ vccw.multisite_options | default({}) }}"
+    when: vccw.multisite
+
+  # Generate Movefile
+  - name: Check `wp scaffold movefile` exists.
+    shell: bash -lc 'wp help scaffold movefile &> /dev/null; echo $?'
+    register: is_command
+  - stat:
+      path: "{{ vccw.vagrant_dir }}/Movefile"
+    register: is_movefile
+  - name: Create a Movefile
+    become: no
+    shell: /bin/bash -lc "wp scaffold movefile --path={{ path }} --force"
+    args:
+      chdir: "{{ vccw.vagrant_dir }}"
+      creates: Movefile.yml
+    when: is_command.stdout == "0" and is_movefile.stat.exists != true

@@ -1,0 +1,21 @@
+---
+# cofigure kubernetes nodes with users and access
+
+- hosts: all
+  become: true
+
+  vars:
+    remote_user_name: vagrant
+
+  tasks:
+
+    - name: Update /etc/hosts with node entries
+      blockinfile:
+        path: /etc/hosts
+        block: |
+          192.168.50.11 ansible-engine
+          192.168.50.21 ansible-node-1 node1
+          192.168.50.22 ansible-node-2 node2
+          192.168.50.23 ansible-node-2 node3
+          192.168.50.24 ansible-node-2 node4
+          192.168.50.25 ansible-node-2 node5

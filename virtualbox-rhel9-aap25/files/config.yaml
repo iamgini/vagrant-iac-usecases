@@ -1,0 +1,52 @@
+---
+- name: Configure nodes
+  hosts: all
+  become: true
+  vars:
+    remote_user_name: vagrant
+  tasks:
+    - name: Modify PasswordAuthentication setting in sshd_config
+      ansible.builtin.replace:
+        path: /etc/ssh/sshd_config
+        regexp: '^PasswordAuthentication no'
+        replace: 'PasswordAuthentication yes'
+
+    - name: Restart SSH service
+      ansible.builtin.systemd:
+        name: sshd
+        state: restarted
+
+    - name: Create 'devops' user with password
+      ansible.builtin.user:
+        name: devops
+        state: present
+        password: "{{ 'devops' | password_hash('sha512') }}"
+
+    - name: Allow 'devops' user to execute sudo without a password
+      ansible.builtin.lineinfile:
+        path: /etc/sudoers.d/devops
+        line: "devops ALL=(ALL) NOPASSWD: ALL"
+        create: true
+
+    - name: Create the .ssh directory for devops user
+      ansible.builtin.file:
+        path: "/home/devops/.ssh"
+        state: directory
+        mode: '0700'
+        owner: devops
+        group: devops
+
+    - name: Copy the id_rsa.pub key to authorized_keys for devops user
+      ansible.builtin.copy:
+        src: "~/.ssh/id_rsa.pub"
+        dest: "/home/devops/.ssh/authorized_keys"
+        owner: devops
+        group: devops
+        mode: '0600'
+        append: yes
+
+    - name: Update /etc/hosts with node entries
+      ansible.builtin.blockinfile:
+        path: /etc/hosts
+        block: |
+          # Test Block

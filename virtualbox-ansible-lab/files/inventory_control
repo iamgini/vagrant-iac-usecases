@@ -1,0 +1,1 @@
+ ansible-lab-control ansible_host=192.168.56.138 ansible_connection=local

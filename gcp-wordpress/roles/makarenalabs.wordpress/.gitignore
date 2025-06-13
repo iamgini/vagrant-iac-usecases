@@ -1,0 +1,5 @@
+.*
+*~
+vagrant_*
+!.travis.yml
+!.gitignore

@@ -1,0 +1,149 @@
+---
+- hosts: all
+  vars:
+    user: "{{ ansible_env.USER | default( 'ubuntu' ) }}"
+
+  tasks:
+
+    - name: Allow remote connections to MySQL
+      become: yes
+      lineinfile:
+        dest: "/etc/mysql/mysql.conf.d/mysqld.cnf"
+        backrefs: yes
+        regexp: '^(bind-address)'
+        line: '# \1'
+      notify:
+        - restart mysql
+
+    - name: Place ~/.my.cnf
+      become: no
+      template:
+        src: templates/.my.cnf
+        dest: "{{ ansible_env.HOME }}/.my.cnf"
+
+    - name: Create SSL dir
+      become: yes
+      file:
+        path: /etc/apache2/ssl
+        state: directory
+
+    # Create SSL Keys
+    - name: Create SSL keys
+      become: yes
+      command: openssl req -batch -new -x509 -newkey rsa:2048 -nodes -sha256 \
+        -subj /CN=*.{{ vccw.hostname }}/O=oreore -days 3650 \
+        -keyout /etc/apache2/ssl/{{ vccw.hostname }}.key \
+        -out /etc/apache2/ssl/{{ vccw.hostname }}.crt
+
+    - name: "Replacing the Apache User"
+      become: yes
+      replace:
+        dest: /etc/apache2/envvars
+        regexp: APACHE_RUN_USER=.*
+        replace: "APACHE_RUN_USER={{ user }}"
+      notify:
+        - restart apache
+
+    - name: "Replacing the Apache Group"
+      become: yes
+      replace:
+        dest: /etc/apache2/envvars
+        regexp: APACHE_RUN_GROUP=.*
+        replace: "APACHE_RUN_GROUP={{ user }}"
+      notify:
+        - restart apache
+
+    # Setup Document Root
+    - name: Place /etc/apache2/sites-available/site.conf
+      become: yes
+      template:
+        src: templates/site.conf
+        dest: /etc/apache2/sites-available/000-default.conf
+      notify:
+        - restart apache
+
+    - name: "Disable keepalive"
+      become: yes
+      replace:
+        dest: /etc/apache2/apache2.conf
+        regexp: KeepAlive .*
+        replace: "KeepAlive Off"
+      notify:
+        - restart apache
+
+    - name: "Setup timeout"
+      become: yes
+      replace:
+        dest: /etc/apache2/apache2.conf
+        regexp: Timeout .*
+        replace: "Timeout 10"
+      notify:
+        - restart apache
+
+    # enable wordpress.conf
+    - name: Enable virtual host for WordPress
+      become: yes
+      command: a2ensite 000-default
+
+    # php config.
+    - name: Update php.ini
+      become: yes
+      lineinfile:
+        dest: /etc/php/7.0/apache2/conf.d/99-vccw.ini
+        create: yes
+        line: "{{ item.key }} = {{ item.value }}"
+      with_dict: "{{ vccw.php_ini }}"
+      notify:
+        - restart apache
+
+    - name: Update php.ini for cli
+      become: yes
+      lineinfile:
+        dest: /etc/php/7.0/cli/conf.d/99-vccw.ini
+        create: yes
+        line: "{{ item.key }} = {{ item.value }}"
+      with_dict: "{{ vccw.php_ini }}"
+
+    # Install mailcatcher as root
+    - name: Install mailcatcher
+      become: yes
+      gem:
+        name: mailcatcher
+        state: latest
+        user_install: no
+      when: vccw.mailcatcher
+    - name: Add mailcatcher to service
+      become: yes
+      template:
+        src: templates/mailcatcher.service
+        dest: /etc/systemd/system/mailcatcher.service
+        mode: 0644
+      when: vccw.mailcatcher
+    - name: Start mailcatcher
+      become: yes
+      service: name=mailcatcher enabled=yes state=started
+      when: vccw.mailcatcher
+    - name: Update php.ini for mailcatcher
+      become: yes
+      lineinfile:
+        dest: /etc/php/7.0/apache2/conf.d/99-vccw.ini
+        create: yes
+        line: "sendmail_path = /usr/bin/env catchmail"
+      when: vccw.mailcatcher
+      notify:
+        - restart apache
+    - name: Update php.ini for mailcatcher for cli
+      become: yes
+      lineinfile:
+        dest: /etc/php/7.0/cli/conf.d/99-vccw.ini
+        create: yes
+        line: "sendmail_path = /usr/bin/env catchmail"
+      when: vccw.mailcatcher
+
+  handlers:
+    - name: restart apache
+      become: yes
+      service: name=apache2 state=restarted
+    - name: restart mysql
+      become: yes
+      service: name=mysql state=restarted

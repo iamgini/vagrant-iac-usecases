@@ -1,0 +1,60 @@
+IMAGE_NAME = "bento/ubuntu-20.04"
+VM_NAME = "Ubuntu-20-CP"
+
+## only needed if you are using ansible engine vm with bridged network
+#ANSILBE_ENGINE_IP = "192.168.1.185"
+
+Vagrant.configure("2") do |config|
+    config.ssh.insert_key = false
+
+    # create ansible controlnode
+    config.vm.define "node" do |node|
+        node.vm.box = IMAGE_NAME
+        #node.vm.network "private_network", ip: "192.168.100.10", virtualbox__intnet: "intnet"
+        node.vm.network "private_network", type: "dhcp", 
+                name: 'vboxnet12', adapter: 2
+        ## Below interface has been disables as different machines will have different bridge interface.
+        ## You can enable this back and use for additional bridged interface on ansible engine node.
+        ## Choose options 1, 2 or 3 when it prompts, depends on the actual network interface on your laptop/workstation.
+        #node.vm.network "public_network", ip: ANSILBE_ENGINE_IP
+        
+        node.vm.hostname = VM_NAME
+
+        # naming the virtualmachine
+        node.vm.provider :virtualbox do |vb|
+            vb.name = VM_NAME
+            vb.memory = 512
+            vb.cpus = 1
+            # enable gui as MacOS Monterey got issue with headless vm
+            # https://github.com/hashicorp/vagrant/issues/12557
+            #vb.gui = true
+        end
+        
+        # provisioning
+        # adding host ssh key for direct ssh login
+        node.vm.provision "file", source: "~/.ssh/id_rsa.pub", destination: "host_ssh_public_key"
+        node.vm.provision "shell", inline: <<-SHELL
+            cat host_ssh_public_key >> /home/vagrant/.ssh/authorized_keys
+        SHELL
+
+        # execute nodes-sshd.sh for configuring ssh.
+        node.vm.provision :shell, path: "files/node-config.sh"
+        
+        # 1. Expecting the project directory conte available at /vagrant.
+        # 2. Using ansible_local to avoid any additional ansible requirement on
+        #    host machine (eg: Windows). Vagrant will install ansible on target machine
+        #    and complete the initial configuration.
+        #node.vm.provision "ansible" do |ansible|
+        #    ansible.compatibility_mode = "2.0"
+        #    ansible.playbook = "files/engine-config.yaml"
+        #    ansible.extra_vars = {
+        #        node_ip: "192.168.100.10",
+        #    }
+        #end
+        
+        # execute nodes-init.yaml for configuring other ansible nodes.
+        ## disabled for engine only setup
+        ## node.vm.provision :shell, path: "files/nodes-init-playbook.sh"
+    end
+        
+end
