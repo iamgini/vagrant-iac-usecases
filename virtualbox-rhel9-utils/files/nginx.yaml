@@ -1,0 +1,55 @@
+---
+- name: Install and configure nginx
+  hosts: all
+  become: true
+
+  tasks:
+
+    - name: Add CentOS 9 Stream BaseOS repo
+      ansible.builtin.yum_repository:
+        name: centos9-baseos
+        description: CentOS Stream 9 - BaseOS
+        baseurl: https://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os/
+        gpgcheck: false
+        enabled: true
+
+    - name: Add CentOS 9 Stream AppStream repo
+      ansible.builtin.yum_repository:
+        name: centos9-appstream
+        description: CentOS Stream 9 - AppStream
+        baseurl: https://mirror.stream.centos.org/9-stream/AppStream/x86_64/os/
+        gpgcheck: false
+        enabled: true
+
+    - name: Install nginx
+      ansible.builtin.dnf:
+        name: nginx
+        state: present
+
+    - name: Start and enable nginx
+      ansible.builtin.systemd:
+        name: nginx
+        state: started
+        enabled: true
+
+    - name: Deploy custom index.html
+      ansible.builtin.copy:
+        src: index.html
+        dest: /usr/share/nginx/html/index.html
+        owner: root
+        group: root
+        mode: '0644'
+
+    - name: Allow HTTP through firewalld
+      ansible.posix.firewalld:
+        service: http
+        permanent: true
+        immediate: true
+        state: enabled
+
+    - name: Allow HTTPS through firewalld
+      ansible.posix.firewalld:
+        service: https
+        permanent: true
+        immediate: true
+        state: enabled

@@ -1,5 +1,5 @@
 ---
-- name: Configure RHEL 9 generic node
+- name: Configure RHEL 9 utils node
   hosts: all
   become: true
 

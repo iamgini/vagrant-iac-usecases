@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(vagrant *)",
+      "Bash(VBoxManage *)",
+      "Bash(wget -O- https://rpm.releases.hashicorp.com/fedora/hashicorp.repo)",
+      "Bash(sudo tee /etc/yum.repos.d/hashicorp.repo)",
+      "Bash(sudo dnf list available vagrant --repo=hashicorp)",
+      "Bash(sudo dnf -y install vagrant-2.4.9-1.x86_64 --repo=hashicorp --allowerasing 2>&1)",
+      "Bash(ssh *)",
+      "Bash(ping -c 1 -W 2 192.168.57.100)",
+      "Bash(curl *)",
+      "Bash(bash update-dns.sh)",
+      "Bash(sort -t. -k4 -n)",
+      "WebFetch(domain:www.redhat.com)",
+      "Bash(gh api *)"
+    ]
+  }
+}

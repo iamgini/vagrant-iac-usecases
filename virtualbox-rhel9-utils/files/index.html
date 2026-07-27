@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lab Utility Server</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Red+Hat+Display:wght@300;400;500;600;700&family=Red+Hat+Text:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: "Red Hat Text", sans-serif;
+            background-color: #151515;
+            color: #e0e0e0;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+        .container {
+            text-align: center;
+            max-width: 700px;
+            padding: 40px;
+        }
+        .logo-bar {
+            margin-bottom: 40px;
+            font-family: "Red Hat Display", sans-serif;
+            font-weight: 700;
+            font-size: 1.6em;
+            color: #ee0000;
+            letter-spacing: 1px;
+        }
+        h1 {
+            font-family: "Red Hat Display", sans-serif;
+            font-weight: 700;
+            font-size: 2.4em;
+            color: #ffffff;
+            margin-bottom: 12px;
+        }
+        .accent {
+            color: #ee0000;
+        }
+        .subtitle {
+            font-size: 1.1em;
+            color: #a0a0a0;
+            font-weight: 400;
+            margin-bottom: 40px;
+        }
+        .info-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            margin-bottom: 40px;
+        }
+        .info-card {
+            background: #1e1e1e;
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 20px;
+            text-align: left;
+        }
+        .info-card .label {
+            font-size: 0.75em;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #888;
+            margin-bottom: 6px;
+        }
+        .info-card .value {
+            font-family: "Red Hat Display", sans-serif;
+            font-size: 1.05em;
+            font-weight: 500;
+            color: #fff;
+        }
+        .divider {
+            width: 60px;
+            height: 3px;
+            background-color: #ee0000;
+            margin: 0 auto 30px;
+            border-radius: 2px;
+        }
+        .footer {
+            font-size: 0.8em;
+            color: #555;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="divider"></div>
+        <h1>Lab <span class="accent">Utility</span> Server</h1>
+        <p class="subtitle">Internal utility server for the lab environment</p>
+        <div class="info-grid">
+            <div class="info-card">
+                <div class="label">Hostname</div>
+                <div class="value">rhel9-utils-1</div>
+            </div>
+            <div class="info-card">
+                <div class="label">Platform</div>
+                <div class="value">RHEL 9 / Nginx</div>
+            </div>
+            <div class="info-card">
+                <div class="label">Network</div>
+                <div class="value">192.168.57.0/24</div>
+            </div>
+            <div class="info-card">
+                <div class="label">Purpose</div>
+                <div class="value">Lab Services</div>
+            </div>
+        </div>
+        <div class="footer">
+            Lab Environment
+        </div>
+    </div>
+</body>
+</html>
