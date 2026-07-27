@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(vagrant up *)",
+      "Bash(VBoxManage --version)",
+      "Bash(vagrant global-status *)",
+      "Bash(systemctl status *)",
+      "Bash(sudo systemctl *)",
+      "Bash(systemctl is-active *)",
+      "Bash(sudo virsh *)"
+    ]
+  }
+}
